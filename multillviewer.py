@@ -259,6 +259,8 @@ while True:
         # newContentSize = (contentSize[0], contentSize[1] + 200)
         # window[column_key].set_size(newContentSize)
 
+        # commen
+
         continue
     else:
         word = values["wordinput"].strip()
