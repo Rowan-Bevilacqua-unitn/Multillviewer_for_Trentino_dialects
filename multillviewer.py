@@ -158,6 +158,10 @@ def Collapsible(layout, key, title='', arrows=("–", "+"), collapsed=False):
 def SText(text, *positionalArgs, **keywordArgs):
     return sg.InputText(text, *positionalArgs, **keywordArgs, size=(len(text)+1, None),  pad=0, use_readonly_for_disable=True, disabled=True, disabled_readonly_background_color="white", border_width=0)
 
+# def SText(text, *positionalArgs, **keywordArgs):
+#     return sg.Text(text, *positionalArgs, **keywordArgs,  pad=0, border_width=0)
+
+
 def LText(text, k, *positionalArgs, **keywordArgs):
     global linkList
     linkList.append(k)
@@ -260,6 +264,97 @@ while True:
         # window[column_key].set_size(newContentSize)
 
         continue
+    #standard synset buttons
+    elif event.startswith("Correct_gloss_"):
+        new_gloss = sg.popup_get_text("Insert gloss")
+        print(new_gloss)
+    elif event.startswith("Remove_sense_from_synset_"):
+        #print(len("Remove_sense_from_synset_")) 25
+        syn_id=event[25:].split("_")[0]
+        remove_sense_layout=[[sg.Text("Select which synonym to remove")]]
+
+        row=[]
+        for sense in synsets[syn_id]["senses"]:
+            row.append(sg.Button(senses[sense]["word"],key=sense))
+            #print(senses[sense]["word"])
+
+        remove_sense_layout.append(row)
+
+        remove_sense_window=sg.Window("Remove synonym", remove_sense_layout)
+
+        r_s_event, r_s_values = remove_sense_window.read()
+
+        remove_sense_window.close()
+
+    elif event.startswith("Add_sense_to_synset_"):
+        new_sense=sg.popup_get_text("Insert new Synonym")
+        print(new_sense)
+
+    elif event.startswith("Correct_sense_of_synset_"):
+
+        #print(len("Correct_sense_of_synset_")) 24
+        syn_id=event[24:].split("_")[0]
+
+        correct_sense_layout=[[sg.Text("Select which synonym to correct")]]
+        row=[]
+        for sense in synsets[syn_id]["senses"]:
+            row.append(sg.Button(senses[sense]["word"],key=sense))
+            print(senses[sense]["word"])
+
+        correct_sense_layout.append(row)
+
+        correct_sense_window=sg.Window("Correct synonym", correct_sense_layout)
+
+        c_s_event, c_s_values = correct_sense_window.read()
+
+        correct_sense_window.close()
+    elif event.startswith("Delexicalize_"):
+        syn_id=event[len("Delexicalize_"):].split("_")[0]
+        print(syn_id)
+    #missing translation buttons
+    elif event.startswith("Add_lexical_gap_"):
+        syn_id=event[len("Add_lexical_gap_"):].split("_")[0]
+    elif event.startswith("Add_synset_translation_"):
+        entry_id=event[len("Add_synset_translation_"):].split("_")[0]
+        syn_id=event[len("Add_synset_translation_"):].split("_")[1]
+
+        if "relations" in synsets[entry_id]:
+            print(synsets[entry_id]["relations"])
+
+            for synreltype in synsets[entry_id]["relations"]:
+
+                target_code=syn_id.split("-")[0]
+                source_code=entry_id.split("-")[0]
+
+                print(synreltype)
+
+                middle_term=""
+                final_term=""
+                for synrel in synsets[entry_id]["relations"][synreltype]:
+                    print(synrel)
+
+                if source_code!=langCode[0]:
+                    middle_term=synsets[synrel["ili"]]
+                else:
+                    middle_term=synrel
+
+                if target_code!=langCode[0]:
+                    if target_code in synsets[middle_term]:
+                        final_term=synsets[middle_term][target_code]
+                else:
+                    final_term=middle_term
+
+                if final_term!="":
+                    print("something")
+
+                
+
+    #lexical gap buttons
+    elif event.startswith("Lexical_gap_info_"):
+        sg.popup("A lexical gap is present where there is no translation from a language to another", title="What is a lexical gap?")
+        continue
+    elif event.startswith("Lexicalize_synset_"):
+        syn_id=event[len("Lexicalize_synset_"):].split("_")[1]
     else:
         word = values["wordinput"].strip()
 
@@ -349,6 +444,7 @@ while True:
 
 
             lexical_gap=False
+            missing_translation=False
             tranlation_present=False
             same_language=False
             translated_synsetId=""
@@ -387,8 +483,8 @@ while True:
                         if target_code in synsets[middle_term]:
                             translated_synsetId=synsets[middle_term][target_code]
                         else: 
-                            print("word not present in target language")
-                            lexical_gap=True
+                            # print("Missing translation")
+                            missing_translation=True
                     
                     #print("translation: "+translated_synsetId)
                     if translated_synsetId != "":
@@ -504,7 +600,8 @@ while True:
                                             translated_layout.append([Collapsible(collapsableSection, collapsableSectionKey, title=" " + relation_type + " relations for " + senses[sense]["word"], arrows=("–", "+"), collapsed = True)])
                             
                         else:
-                            print("Not lexicalized, ",translated_synsetId)
+                            
+                            # print("Not lexicalized, ",translated_synsetId)
                             lexical_gap=True
             
             
@@ -660,21 +757,43 @@ while True:
     
             translated_column_key=""
             if lexical_gap:
-                #needs implementation
-                Lexical_gap_button=sg.Button("Add word")
-                translated_layout.append([Lexical_gap_button])
-            elif not (same_language or not tranlation_present):
-                #needs implementation
-                Correction_button_translation=sg.Button("Correct word")
-                translated_layout.append([Correction_button_translation])
 
-            #needs implementation
-            Correction_button=sg.Button("Correct word")
-            entry_layout.append([Correction_button])
+                Lexical_gap_info=sg.Button("ℹ", key="Lexical_gap_info_" + entry["synsetId"] + "_" + translated_synsetId, pad=((0,3),(3,3)))
+                translated_layout.append([sg.Text("Lexical gap", font="Helvetica 12"), Lexical_gap_info])
+                
+                Lexical_gap_button=sg.Button("Add word", key="Lexicalize_synset_" + entry["synsetId"] + "_" + translated_synsetId)
+
+                translated_layout.append([Lexical_gap_button])
+            elif missing_translation:
+
+                translated_layout.append([sg.Text("Missing translation", font="Helvetica 12")])
+                
+                Missing_translation_button=sg.Button("Add translation", key="Add_synset_translation_" + entry["synsetId"] + "_" + translated_synsetId)
+                Add_lexical_gap_button=sg.Button("Add lexical gap",key="Add_lexical_gap_" + entry["synsetId"] + "_" + translated_synsetId, pad=((3,0),(3,3)))
+                Lexical_gap_info=sg.Button("ℹ", key="Lexical_gap_info_" + entry["synsetId"] + "_" + translated_synsetId, pad=((0,3),(3,3)))
+
+                translated_layout.append([Missing_translation_button, Add_lexical_gap_button, Lexical_gap_info])
+            elif not (same_language or not tranlation_present):
+
+                Correction_button_translation=sg.Button("Correct word", key="Correct_sense_of_synset_" + entry["synsetId"] + "_" + translated_synsetId)
+                Gloss_correction_button_tranlslation=sg.Button("Correct gloss", key="Correct_gloss_" + entry["synsetId"] + "_" + translated_synsetId)
+                Add_synonym_button_translation=sg.Button("Add synonym", key="Add_sense_to_synset_" + entry["synsetId"] + "_" + translated_synsetId)
+                Remove_synonym_button_translation=sg.Button("Remove synonym", key="Remove_sense_from_synset_" + entry["synsetId"] + "_" + translated_synsetId)
+                To_lexical_gap_button=sg.Button("Change to lexical gap", key="Delexicalize_" + entry["synsetId"] + "_" + translated_synsetId)
+
+                translated_layout.append([Correction_button_translation, Gloss_correction_button_tranlslation, Add_synonym_button_translation, Remove_synonym_button_translation, To_lexical_gap_button])
+
+            
+            Correction_button=sg.Button("Correct word", key="Correct_sense_of_synset_" + entry["synsetId"])
+            Gloss_correction_button=sg.Button("Correct gloss", key="Correct_gloss_" + entry["synsetId"])
+            Add_synonym_button=sg.Button("Add synonym", key="Add_sense_to_synset_" + entry["synsetId"])
+            Remove_synonym_button=sg.Button("Remove synonym", key="Remove_sense_from_synset_" + entry["synsetId"])
+
+            entry_layout.append([Correction_button, Gloss_correction_button, Add_synonym_button, Remove_synonym_button])
             
             if translated_synsetId!="":
                 translated_column_key="column_"+translated_synsetId+"_"+entry["synsetId"]
-            
+
             translated_column=sg.Column(translated_layout, key = translated_column_key, vertical_alignment="top", pad=((0,0),(3,10)))
             
             entry_layout.append([sg.Sizer(window.size[0]/2 + 6, 0)])
