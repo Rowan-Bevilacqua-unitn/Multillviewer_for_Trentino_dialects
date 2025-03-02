@@ -50,10 +50,18 @@ class SaxHandler(xml.sax.ContentHandler):
             if sense["synsetId"] not in synsets:
                 synsets[sense["synsetId"]] = {}
                 synsets[sense["synsetId"]]["lemmas"] = []
-            synsets[sense["synsetId"]]["lemmas"].append(self.currentLemma)
 
+            if "status" in attrs.getNames():
+                senses[word["senseId"]]["status"]=attrs.getValue("status")
+                if  senses[word["senseId"]]["status"]!="deleted":
+                    synsets[sense["synsetId"]]["lemmas"].append(self.currentLemma) 
+            else:
+                senses[word["senseId"]]["status"]="unmodified"
+                synsets[sense["synsetId"]]["lemmas"].append(self.currentLemma)
+            
             if word["synsetId"] not in synsets:
                 synsets[word["synsetId"]]={}
+
             if "senses" not in synsets[word["synsetId"]]:
                 synsets[word["synsetId"]]["senses"]=[]
             synsets[word["synsetId"]]["senses"].append(word["senseId"])
@@ -171,6 +179,138 @@ def resource_path(relative_path):
     base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base_path, relative_path)
 
+# return unique value(s) for new object id(s) and update file based on how many new objects will be created
+def id_next(obj, increase):
+    filein=open("obj_ids.txt","r")
+    fileout=open("obj_ids_tmp.txt","w")
+
+    buffer=filein.readline()
+    while(buffer!=""):
+        if obj==buffer.split("-")[0]:
+            ret=int(buffer.split("-")[1])
+            
+            fileout.write(obj+"-"+str(ret+increase)+"\n")
+        else:
+            fileout.write(buffer)
+        
+        buffer=filein.readline()
+    
+    filein.close()
+    fileout.close()
+
+    os.remove("obj_ids.txt")
+    os.rename("obj_ids_tmp.txt","obj_ids.txt")
+
+    return ret
+
+# add sense: new_sense to synset :syn_id modifying file: file; will also add the sense and relative information to the data on the stack\in memory
+def add_sense(new_sense, syn_id, file):
+
+    word_lang=syn_id.split("-")[0]
+    word_pos=synsets[syn_id]["pos"]
+    filein=open(file,"r",encoding="utf8")
+    fileout=open(file[:-4]+"_tmp.xml","w",encoding="utf8")
+    buffer=filein.readline()
+
+    current_language=""
+    found_lexical_entry=False
+    while(buffer!=""):
+            
+        if "<Lexicon " in buffer:
+            current_language=buffer.strip().split(" ")[3].split("\"")[1]
+            if current_language==word_lang:
+                lexicon_start=filein.tell()
+
+        if "writtenForm=\""+new_sense+"\"" in buffer and current_language==word_lang and buffer.split("partOfSpeech=\"")[1][0]==word_pos:
+                    
+            fileout.write(buffer)
+
+            buffer=filein.readline()
+
+            found_deleted=False
+            while buffer!= "    </LexicalEntry>\n":
+
+                if "synset=\""+syn_id+"\"" and "status=\"deleted\"" in buffer:
+
+                    fileout.write(buffer.split("status=\"deleted\"")[0] + "status=\"new\"" + buffer.split("status=\"deleted\"")[1])
+
+                    sense_id=buffer.split("id=\"")[1].split("\"")[0]
+                    senses[sense_id]["status"]="new"
+                    synsets[syn_id]["lemmas"].append(new_sense)
+
+                    found_deleted=True
+                    found_lexical_entry=True
+                    break
+                else:
+                    fileout.write(buffer)
+                
+                buffer=filein.readline()
+
+            if not found_deleted:
+                new_id=id_next("sen",1)
+                fileout.write("      <Sense id=\""+word_lang+"-sennew"+str(new_id)+"\" synset=\""+syn_id+"\" status=\"new\"></Sense>\n")
+                found_lexical_entry=True
+
+                new_id=word_lang+"-sennew"+str(new_id)
+                sense={}
+                sense["word"]=new_sense
+                sense["pos"]=word_pos
+                sense["synsetId"]=syn_id
+                senses[str(new_id)]=sense
+
+                synsets[syn_id]["lemmas"].append(new_sense)
+                synsets[syn_id]["senses"].append(new_id)
+
+                fileout.write(buffer)
+
+        else:
+            fileout.write(buffer)
+
+        buffer=filein.readline()
+
+    if not found_lexical_entry:
+        filein.seek(lexicon_start)
+        fileout.seek(lexicon_start)
+        fileout.truncate()
+
+        new_idw=id_next("wor",1)
+        fileout.write("    <LexicalEntry id=\""+word_lang+"-word-"+word_pos+"new"+str(new_idw)+"\" status=\"new\">\n")
+        fileout.write("      <Lemma writtenForm=\""+new_sense+"\" partOfSpeech=\""+word_pos+"\"></Lemma>\n")
+        new_ids=id_next("sen",1)
+        fileout.write("      <Sense id=\""+word_lang+"-sennew"+str(new_ids)+"\" synset=\""+syn_id+"\" status=\"new\"></Sense>\n")
+        fileout.write("    </LexicalEntry>\n")
+            
+        buffer=filein.readline()
+        while(buffer!=""):
+            fileout.write(buffer)
+            buffer=filein.readline()
+
+        new_ids=word_lang+"-sennew"+str(new_ids)
+        word={}
+        word["senseId"] = new_ids
+        word["synsetId"] = syn_id
+        word["pos"] = word_pos
+
+        lemmas[new_sense]=[word]
+
+        sense={}
+        sense["word"]=new_sense
+        sense["pos"]=word_pos
+        sense["synsetId"]=syn_id
+        sense["status"]="new"
+        senses[str(new_ids)]=sense
+
+        synsets[syn_id]["lemmas"].append(new_sense)
+        synsets[syn_id]["senses"].append(new_ids)
+
+    filein.close()
+    fileout.close()
+
+    os.remove(file)
+    os.rename(file[:-4]+"_tmp.xml",file)
+
+    return 0
+
 # ==================================================================================
 
 WINDOW_TITLE = 'LiveLanguage Lexicon View'
@@ -192,7 +332,6 @@ if len(sys.argv) < 2:
     print("An LMF/XML file is needed as input argument! Exiting.")
     sys.exit(1)
 
-    
 file = sys.argv[1]
 
 fn = open(file, encoding="utf8")
@@ -200,6 +339,7 @@ parser = xml.sax.make_parser()
 handler = SaxHandler()
 parser.setContentHandler(handler)
 parser.parse(fn) # TODO: validation
+fn.close()
 
 
 if len(langName)==0:
@@ -208,11 +348,15 @@ if len(langName)==0:
 
 sg.change_look_and_feel('LightGrey1')
 
+if not os.path.exists("obj_ids.txt"):
+    fileout=open("obj_ids.txt","w")
+    fileout.write("syn-0\nsen-0\nwor-0\nili-0\n")
+    fileout.close()
 
 layoutTop = [
                 [sg.Text('Multi-LiveLanguage Lexicon  Hub:[' + langCode[0] + ']', font='Verdana 14 bold'), sg.Text('Language to translate to:', font='Verdana 12'), sg.OptionMenu(langName, key="-Selected language-")],
                 [sg.Text('Word to search for:', font='Helvetica 12'), sg.InputText(key="wordinput", font='Helvetica 12',focus = True), sg.Button('Search Lexicon', bind_return_key = True)],
-                [sg.Column([], key="content", size=(80,200))]
+                [sg.Column([], key="content")]
             ]
 Lexicon_info_combo=sg.Combo(langName,enable_events=True,readonly=True,key="Lexicon_info")
 layoutBottom = [sg.Text("Lexicon info:",font="Verdana 10"),Lexicon_info_combo,sg.Push(),sg.Button('Quit')]
@@ -264,19 +408,75 @@ while True:
         # window[column_key].set_size(newContentSize)
 
         continue
-    #standard synset buttons
+    # synset-entry buttons
     elif event.startswith("Correct_gloss_"):
-        new_gloss = sg.popup_get_text("Insert gloss")
-        print(new_gloss)
+
+        splite=event[len("Correct_gloss_"):].split("_")
+        if len(splite)==1:
+            syn_id=splite[0]
+        else:
+            syn_id=splite[1]
+
+        new_gloss = sg.popup_get_text("Insert gloss",default_text=synsets[syn_id]["gloss"].split("] ")[1])
+        gloss_lang=synsets[syn_id]["gloss"].split("] ")[0]+"] "
+
+        if new_gloss!=None:
+
+            filein=open(file,"r",encoding="utf8")
+            fileout=open(file[:-4]+"_tmp.xml","w",encoding="utf8")
+            buffer=filein.readline()
+            while(buffer!=""):
+            
+                if "Synset id=\"" + syn_id + "\"" in buffer:
+                
+                    fileouttmp=open("tmp","w")
+                
+                    if not "status=\"" in buffer:
+                        fileouttmp.write(buffer[0:-2] + " status=\"modified\">\n")
+                        fileout.write(buffer[0:-2] + " status=\"modified\">\n")
+                    #elif " status=\"unmodified\"" in buffer:
+                    else:
+                        fileouttmp.write(buffer)
+                        fileout.write(buffer)
+
+                    buffer=filein.readline()
+
+                    fileouttmp.write(buffer.split(">")[0]+ ">" + new_gloss + "</Definition>\n")
+                    fileout.write(buffer.split(">")[0]+ ">" + new_gloss + "</Definition>\n")
+                
+                
+                    fileouttmp.close()
+                else:
+                    fileout.write(buffer)
+                    
+                buffer=filein.readline()
+
+            filein.close()
+            fileout.close()
+            synsets[syn_id]["gloss"]=gloss_lang + new_gloss
+
+            os.remove(file)
+            os.rename(file[:-4]+"_tmp.xml",file)
+        
+        else:
+            continue
+        
     elif event.startswith("Remove_sense_from_synset_"):
-        #print(len("Remove_sense_from_synset_")) 25
-        syn_id=event[25:].split("_")[0]
+        
+        splite=event[len("Remove_sense_from_synset_"):].split("_")
+
+        if len(splite)==1:
+            syn_id=splite[0]
+        else:
+            syn_id=splite[1]
+        
         remove_sense_layout=[[sg.Text("Select which synonym to remove")]]
 
         row=[]
         for sense in synsets[syn_id]["senses"]:
-            row.append(sg.Button(senses[sense]["word"],key=sense))
-            #print(senses[sense]["word"])
+
+            if senses[sense]["status"]!="deleted":
+                row.append(sg.Button(senses[sense]["word"],key=sense))
 
         remove_sense_layout.append(row)
 
@@ -284,37 +484,305 @@ while True:
 
         r_s_event, r_s_values = remove_sense_window.read()
 
+        if(r_s_event!=None):
+
+            filein=open(file,"r",encoding="utf8")
+            fileout=open(file[:-4]+"_tmp.xml","w",encoding="utf8")
+
+            buffer=filein.readline()
+
+            while buffer!="":
+
+                if "<Sense id=\"" + r_s_event + "\"" in buffer:
+
+                    # fileouttmp=open("tmp","w",encoding="utf8")
+
+                    if "status=\"" in buffer:
+                        fileout.write(buffer.split("status=\"")[0] + "status=\"deleted\"" + buffer.split("status=\"")[1].split("\"")[1])
+                    else:
+                        splitb=buffer.split("\">")
+                        fileout.write(splitb[0] + "\" status=\"deleted\">" + splitb[1])
+
+                    # fileouttmp.close()
+                else:
+                    fileout.write(buffer)
+                
+                buffer=filein.readline()
+
+            senses[r_s_event]["status"]="deleted"
+            synsets[syn_id]["lemmas"].remove(senses[r_s_event]["word"])
+
+            filein.close()
+            fileout.close()
+
+            os.remove(file)
+            os.rename(file[:-4]+"_tmp.xml",file)
+        else:
+            continue
+
         remove_sense_window.close()
 
     elif event.startswith("Add_sense_to_synset_"):
+
+        splite=event[len("Add_sense_to_synset_"):].split("_")
+
+        if len(splite)==1:
+            syn_id=splite[0]
+        else:
+            syn_id=splite[1]
+
         new_sense=sg.popup_get_text("Insert new Synonym")
-        print(new_sense)
 
-    elif event.startswith("Correct_sense_of_synset_"):
-
-        #print(len("Correct_sense_of_synset_")) 24
-        syn_id=event[24:].split("_")[0]
-
-        correct_sense_layout=[[sg.Text("Select which synonym to correct")]]
-        row=[]
+        unique=True
         for sense in synsets[syn_id]["senses"]:
-            row.append(sg.Button(senses[sense]["word"],key=sense))
-            print(senses[sense]["word"])
 
-        correct_sense_layout.append(row)
+            if senses[sense]["word"]==new_sense and senses[sense]["status"]!="deleted":
+                unique=False
+                break
+        
+        if new_sense!=None and unique:
 
-        correct_sense_window=sg.Window("Correct synonym", correct_sense_layout)
+            ret_val=add_sense(new_sense, syn_id, file)
+        
 
-        c_s_event, c_s_values = correct_sense_window.read()
+    # deprecated
+    # elif event.startswith("Correct_sense_of_synset_"):
 
-        correct_sense_window.close()
+    #     splite=event[len("Correct_sense_of_synset_"):].split("_")
+
+    #     if len(splite)==1:
+    #         syn_id=splite[0]
+    #     else:
+    #         syn_id=splite[1]
+
+    #     correct_sense_layout=[[sg.Text("Select which synonym to correct")]]
+    #     row=[]
+    #     for sense in synsets[syn_id]["senses"]:
+    #         if senses[sense]["status"]!="deleted":
+    #             row.append(sg.Button(senses[sense]["word"],key=sense))
+
+    #     correct_sense_layout.append(row)
+
+    #     correct_sense_window=sg.Window("Correct synonym", correct_sense_layout)
+
+    #     c_s_event, c_s_values = correct_sense_window.read()
+
+    #     correct_sense_window.close()
+
+    #     if c_s_event!=None:
+    #         corrected_sense=sg.popup_get_text("Correct synonym: "+senses[c_s_event]["word"], default_text = senses[c_s_event]["word"])
+    #     else: continue
+
+    #     unique=True
+    #     for sense in synsets[syn_id]["senses"]:
+
+    #         if senses[sense]["word"]==corrected_sense and senses[sense]["status"]!="deleted":
+    #             unique=False
+    #             break
+
+    #     if corrected_sense!=None and corrected_sense!=c_s_event and unique:
+
+    #         filein=open(file,"r",encoding="utf8")
+    #         fileout=open(file[:-4]+"_tmp.xml","w",encoding="utf8")
+    #         word_lang=syn_id.split("-")[0]
+    #         word_pos=synsets[syn_id]["pos"]
+
+    #         buffer=filein.readline()
+            
+    #         while buffer!="":
+
+    #             if "<Lexicon " in buffer:
+    #                 current_language=buffer.strip().split(" ")[3].split("\"")[1]
+    #                 fileout.write(buffer)
+
+    #                 if current_language==word_lang:
+    #                     lexicon_start=filein.tell()
+
+    #                     buffer=filein.readline()
+    #                     found_Lexical_Entry=False
+    #                     sense_block=""
+    #                     while not "</Lexicon>" in buffer:
+                            
+    #                         if (not found_Lexical_Entry) and "writtenForm=\""+corrected_sense+"\"" in buffer and buffer.split("partOfSpeech=\"")[1][0]==word_pos:
+
+    #                             found_Lexical_Entry=True
+    #                         elif "id=\"" + c_s_event + "\"" in buffer:
+                                
+    #                             if "status=\"" in buffer:
+    #                                 if buffer.split("status=\"")[1].split("\"")[0]!="new":
+    #                                     buffer=buffer.split("status=\"")[0] + "status=\"modified\"" + buffer.split("status=\"")[1].split("\"")[1]
+    #                             else:
+    #                                 buffer=buffer.split("\">")[0] + "\" status=\"modified\">" + buffer.split("\">")[1]
+
+    #                             while buffer!="":
+
+    #                                 if "</Sense>" in buffer:
+    #                                     sense_block+=buffer
+    #                                     break
+    #                                 else:
+    #                                     sense_block+=buffer
+
+    #                                 buffer=filein.readline()
+                            
+    #                         buffer=filein.readline()
+                        
+    #                     filein.seek(lexicon_start)
+
+    #                     if found_Lexical_Entry:
+                            
+    #                         buffer=filein.readline()
+    #                         while buffer!="":
+
+    #                             if "writtenForm=\""+corrected_sense+"\"" in buffer and buffer.split("partOfSpeech=\"")[1][0]==word_pos:
+    #                                 fileout.write(buffer)
+    #                                 fileout.write(sense_block)
+    #                                 break
+    #                             elif "id=\"" + c_s_event + "\"" in buffer:
+
+    #                                 while buffer!="":
+    #                                     if "</Sense>" in buffer:
+    #                                         break
+    #                                 buffer=filein.readline()
+    #                             else:
+    #                                 fileout.write(buffer)
+
+    #                             buffer=filein.readline()
+
+    #                     else:
+    #                         new_idw=id_next("wor",1)
+    #                         fileout.write("    <LexicalEntry id=\""+word_lang+"-word-"+synsets[syn_id]["pos"]+"new"+str(new_idw)+"\" status=\"new\">\n")
+    #                         fileout.write("      <Lemma writtenForm=\""+ corrected_sense +"\" partOfSpeech=\""+ synsets[syn_id]["pos"] +"\"></Lemma>\n")
+    #                         fileout.write(sense_block)
+    #                         fileout.write("    </LexicalEntry>\n")
+
+    #                         buffer=filein.readline()
+    #                         while buffer!="":
+    #                             if "id=\"" + c_s_event + "\"" in buffer:
+
+    #                                 while buffer!="":
+    #                                     if "</Sense>" in buffer:
+    #                                         break
+    #                                 buffer=filein.readline()
+    #                             else:
+    #                                 fileout.write(buffer)
+
+    #                             buffer=filein.readline()
+
+    #             else:
+    #                 fileout.write(buffer)
+
+    #             buffer=filein.readline()
+
+    #         filein.close()
+    #         fileout.close()
+
+    #         oldsense=senses[c_s_event]["word"]
+
+    #         senses[c_s_event]["word"]==corrected_sense
+    #         if senses[c_s_event]["status"]!="new":
+    #             senses[c_s_event]["status"]="modified"
+
+    #         synsets[syn_id]["lemmas"].remove(oldsense)
+    #         synsets[syn_id]["lemmas"].append(corrected_sense)
+
+    #         for worddict in lemmas[oldsense]:
+    #             if worddict["senseId"]==c_s_event:
+    #                 lemmas[oldsense].remove(worddict) 
+    #                 if len(lemmas[oldsense])==0:
+    #                     lemmas.pop(oldsense)
+            
+    #         worddict={}
+
+    #         worddict["senseId"]=c_s_event
+    #         worddict["synsetId"]=syn_id
+    #         worddict["pos"]=word_pos
+
+    #         if not corrected_sense in lemmas:
+    #             lemmas[corrected_sense]=[]
+    #         lemmas[corrected_sense].append(worddict)
+
+            # os.remove(file)
+            # os.rename(file[:-4]+"_tmp.xml",file)
+            
+        # else: 
+        #     continue
+
     elif event.startswith("Delexicalize_"):
-        syn_id=event[len("Delexicalize_"):].split("_")[0]
-        print(syn_id)
+        syn_id=event[len("Delexicalize_"):].split("_")[1]
+        
+        filein=open(file,"r",encoding="utf8")
+        fileout=open(file[:-4]+"_tmp.xml","w",encoding="utf8")
+
+        buffer=filein.readline()
+
+        while(buffer!=""):
+            
+            if "<Synset id=\""+syn_id+"\"" in buffer:
+                # fileouttmp=open("tmp","w",encoding="utf8")
+                buffer=buffer.split("lexicalized=\"true\"")[0]+"lexicalized=\"false\""+buffer.split("lexicalized=\"true\"")[1]
+                # fileouttmp.close()
+                if not "status=\"" in buffer:
+                    fileout.write(buffer[0:-2] + " status=\"modified\">\n")
+                    #elif " status=\"unmodified\"" in buffer:
+                else:
+                    fileout.write(buffer)
+
+            else:
+                fileout.write(buffer)
+
+            buffer=filein.readline()
+        
+        synsets[syn_id]["lexicalized"]="false"
+
+        filein.close()
+        fileout.close()
+
+        os.remove(file)
+        os.rename(file[:-4]+"_tmp.xml",file)
+
     #missing translation buttons
     elif event.startswith("Add_lexical_gap_"):
         syn_id=event[len("Add_lexical_gap_"):].split("_")[0]
+        target_lang=event[len("Add_lexical_gap_"):].split("_")[1]
+        filein=open(file,"r",encoding="utf8")
+        fileout=open(file[:-4]+"_tmp.xml","w",encoding="utf8")
+
+        target_ili=""
+        if syn_id.split("-")[0]==langCode[0]:
+            target_ili=syn_id
+        else:
+            target_ili=synsets[syn_id]["ili"]
+
+        buffer=filein.readline()
+
+        target_lexicon=False
+        while buffer!="":
+            if not target_lexicon and "<Lexicon " in buffer and buffer.strip().split(" ")[3].split("\"")[1]==target_lang:
+                target_lexicon=True
+
+            if target_lexicon and "</Lexicon>" in buffer:
+                #fileouttmp=open("tmp","w",encoding="utf8")
+
+                # to be completed
+                #new_id=id_next("syn", 1)
+                fileout.write("    <Synset id=\""+ target_lang +"-gap-"+ langCode[0] +"new" + "tmp" + "\" ili=\""+ target_ili +"\" lexicalized=\"false\" status=\"new\"></Synset>\n")
+                fileout.write(buffer)
+
+                #fileouttmp.close()
+                target_lexicon=False
+            else:
+                fileout.write(buffer)
+            buffer=filein.readline()
+
+
+        filein.close()
+        fileout.close()
+
+        # os.remove(file)
+        # os.rename(file[:-4]+"_tmp.xml",file)
+
     elif event.startswith("Add_synset_translation_"):
+
         entry_id=event[len("Add_synset_translation_"):].split("_")[0]
         syn_id=event[len("Add_synset_translation_"):].split("_")[1]
 
@@ -347,14 +815,44 @@ while True:
                 if final_term!="":
                     print("something")
 
-                
+        # to be completed
 
-    #lexical gap buttons
-    elif event.startswith("Lexical_gap_info_"):
-        sg.popup("A lexical gap is present where there is no translation from a language to another", title="What is a lexical gap?")
+
+    # untranslatable buttons
+    elif event.startswith("Untranslatable_info_"):
+        sg.popup("A concept is untranslatable if there is no way to translate it without using a description", title="What does untranslatable mean?")
         continue
+
     elif event.startswith("Lexicalize_synset_"):
+
         syn_id=event[len("Lexicalize_synset_"):].split("_")[1]
+        source_id=event[len("Lexicalize_synset_"):].split("_")[0]
+
+        filein=open(file,"r",encoding="utf8")
+        fileout=open(file[:-4]+"_tmp.xml","w",encoding="utf8")
+        
+        buffer=filein.readline()
+
+        while buffer!="":
+
+            if "Synset id=\"" + syn_id + "\"" in buffer:
+
+                if "pos" not in  synsets[syn_id]:
+                    synsets[syn_id]["pos"]=synsets[source_id]["pos"]               
+
+                if "gloss" not in synsets[syn_id]:
+                    synsets[syn_id]["gloss"]=sg.popup_get_text("Insert gloss")
+
+                if not "senses" in synsets[syn_id]:
+                    new_sense=sg.popup_get_text("Insert word")
+
+            buffer=filein.readline()
+
+        filein.close()
+        fileout.close()
+
+        # to be completed
+
     else:
         word = values["wordinput"].strip()
 
@@ -395,14 +893,16 @@ while True:
                         if reltype not in relsByType:
                             relsByType[reltype] = []
                         relsByType[reltype].append(targetSynset)
-            if pos not in contentByPos:
-                contentByPos[pos] = []
-            content = {}
-            content["gloss"] = synset["gloss"]
-            content["relations"] = relsByType
-            content["synsetId"] = synsetId
-            content["lemmas"] = synsets[synsetId]["lemmas"]
-            contentByPos[pos].append(content)
+
+            if synsets[synsetId]["lexicalized"]=="true":
+                if pos not in contentByPos:
+                    contentByPos[pos] = []
+                content = {}
+                content["gloss"] = synset["gloss"]
+                content["relations"] = relsByType
+                content["synsetId"] = synsetId
+                content["lemmas"] = synsets[synsetId]["lemmas"]
+                contentByPos[pos].append(content)
     layoutBody = []
 
     for pos in contentByPos:
@@ -443,11 +943,12 @@ while True:
                 entry_layout.append(layoutRow)
 
 
-            lexical_gap=False
+            untranslatable=False
             missing_translation=False
             tranlation_present=False
             same_language=False
             translated_synsetId=""
+            target_code=""
             if not values["-Selected language-"] not in langName:
 
                 synset_language=langName[0]
@@ -476,19 +977,18 @@ while True:
                     
                     if values["-Selected language-"]==langName[0]:
                         translated_synsetId=middle_term
+                        target_code=langCode[0]
                     else:
                         j=langName.index(values["-Selected language-"])
                         target_code=langCode[j]
 
                         if target_code in synsets[middle_term]:
                             translated_synsetId=synsets[middle_term][target_code]
-                        else: 
-                            # print("Missing translation")
+                        else:
                             missing_translation=True
-                    
-                    #print("translation: "+translated_synsetId)
+
                     if translated_synsetId != "":
-                        if  "lemmas" in synsets[translated_synsetId]:
+                        if  "lemmas" in synsets[translated_synsetId] and synsets[translated_synsetId]["lexicalized"]=="true":
 
                             translated_lemmaList=", ".join(synsets[translated_synsetId]["lemmas"])
 
@@ -521,52 +1021,53 @@ while True:
 
                                     collapsableSection=[]
                                     for relation_target in synsets[translated_synsetId]["relations"][relation_type]:
-
-                                        collapsableRow=[sg.Text("              ", font="Helvetica 12 bold")]
-                                        lemmaList = synsets[relation_target]["lemmas"]
-                                        initial_row_size=len("              ")
                                         
-                                        for lemma in lemmaList:
-                                            initial_row_size+=(len(lemma)+3)
+                                        if synsets[relation_target]["lexicalized"]=="true":
+                                            collapsableRow=[sg.Text("              ", font="Helvetica 12 bold")]
+                                            lemmaList = synsets[relation_target]["lemmas"]
+                                            initial_row_size=len("              ")
+                                        
+                                            for lemma in lemmaList:
+                                                initial_row_size+=(len(lemma)+3)
                                             
-                                            lemmaKey = "LEMMA:" + lemma + "_" + translated_synsetId + "_" + entry["synsetId"]
-                                            collapsableRow = collapsableRow + LText(lemma, lemmaKey, enable_events = True, font='Helvetica 12 bold', text_color='blue')
+                                                lemmaKey = "LEMMA:" + lemma + "_" + translated_synsetId + "_" + entry["synsetId"]
+                                                collapsableRow = collapsableRow + LText(lemma, lemmaKey, enable_events = True, font='Helvetica 12 bold', text_color='blue')
                                         
-                                        gloss = synsets[relation_target]["gloss"]
+                                            gloss = synsets[relation_target]["gloss"]
 
 
-                                        if initial_row_size > window.size[0]/(5*10):
-                                            wraplength=int((window.size[0]/(2*10)) - len("              "))
+                                            if initial_row_size > window.size[0]/(5*10):
+                                                wraplength=int((window.size[0]/(2*10)) - len("              "))
 
-                                            collapsableSection.append(collapsableRow)
-                                            for line in textwrap.wrap(gloss, wraplength):
-                                                collapsableRow = []
-                                                collapsableRow.append(GLOSS_DISPLAY("              " + "  " + line))
                                                 collapsableSection.append(collapsableRow)
-
-                                        else:    
-                                            wraplength=int(window.size[0]/(2*10))-(initial_row_size)-2
-                                            if wraplength<5:
-                                                wraplength=5
-
-                                            first=True
-                                            for line in textwrap.wrap(gloss, wraplength):
-                                                if first==False:
+                                                for line in textwrap.wrap(gloss, wraplength):
                                                     collapsableRow = []
-                                                    collapsableRow.append(GLOSS_DISPLAY(' '*(initial_row_size-6)))
-                
-                                                first=False
-                                                collapsableRow.append(GLOSS_DISPLAY(line))
-                                                collapsableSection.append(collapsableRow)
+                                                    collapsableRow.append(GLOSS_DISPLAY("              " + "  " + line))
+                                                    collapsableSection.append(collapsableRow)
 
-                                    collapsableSectionKey = "COLLAPSE_" + translated_synsetId + "_" + entry["synsetId"] + "|" + relation_type
-                                    translated_layout.append([Collapsible(collapsableSection, collapsableSectionKey, title=" " + relation_type + " relations", arrows=("–", "+"), collapsed = True)])
+                                            else:    
+                                                wraplength=int(window.size[0]/(2*10))-(initial_row_size)-2
+                                                if wraplength<5:
+                                                    wraplength=5
+
+                                                first=True
+                                                for line in textwrap.wrap(gloss, wraplength):
+                                                    if first==False:
+                                                        collapsableRow = []
+                                                        collapsableRow.append(GLOSS_DISPLAY(' '*(initial_row_size-6)))
+                
+                                                    first=False
+                                                    collapsableRow.append(GLOSS_DISPLAY(line))
+                                                    collapsableSection.append(collapsableRow)
+                                    if collapsableSection!=[]:
+                                        collapsableSectionKey = "COLLAPSE_" + translated_synsetId + "_" + entry["synsetId"] + "|" + relation_type
+                                        translated_layout.append([Collapsible(collapsableSection, collapsableSectionKey, title=" " + relation_type + " relations", arrows=("–", "+"), collapsed = True)])
 
                             if "senses" in synsets[translated_synsetId]:
 
                                 for sense in synsets[translated_synsetId]["senses"]:
                                     #print("synset_senses: "+sense)
-                                    if "relations" in senses[sense]:
+                                    if "relations" in senses[sense] and senses[sense]["status"]!="deleted":
                                         for relation_type in senses[sense]["relations"]:
                                             #print(relation_type+str(senses[sense]["relations"][relation_type]))
                                             collapsableSection=[]
@@ -575,34 +1076,35 @@ while True:
 
                                                 # print(relation_target)
                                                 # print("translatedsynsetId: "+translated_synsetId)
-                                                
-                                                collapsableRow=[sg.Text("              ", font="Helvetica 12 bold")]
-                                                lemma=senses[relation_target]["word"]
-                                                lemmaKey = "LEMMA:" + lemma + "_" + relation_target + "_" + sense + "_" + translated_synsetId + "_" + entry["synsetId"]
-                                                collapsableRow = collapsableRow + LText(lemma, lemmaKey, enable_events = True, font='Helvetica 12 bold', text_color='blue')
-                                                gloss = synsets[senses[relation_target]["synsetId"]]["gloss"]
+                                                if senses[relation_target]["status"]!="deleted":
+                                                    collapsableRow=[sg.Text("              ", font="Helvetica 12 bold")]
+                                                    lemma=senses[relation_target]["word"]
+                                                    lemmaKey = "LEMMA:" + lemma + "_" + relation_target + "_" + sense + "_" + translated_synsetId + "_" + entry["synsetId"]
+                                                    collapsableRow = collapsableRow + LText(lemma, lemmaKey, enable_events = True, font='Helvetica 12 bold', text_color='blue')
+                                                    gloss = synsets[senses[relation_target]["synsetId"]]["gloss"]
 
-                                                wraplength=int(window.size[0]/(2*10))-len("              " + lemma)-1
-                                                if wraplength<5:
-                                                    wraplength=5
+                                                    wraplength=int(window.size[0]/(2*10))-len("              " + lemma)-1
+                                                    if wraplength<5:
+                                                        wraplength=5
 
-                                                first=True
-                                                for line in textwrap.wrap(gloss, wraplength):
-                                                    if first==False:
-                                                        collapsableRow = []
-                                                        collapsableRow.append(GLOSS_DISPLAY(' '*(len(lemma + "              ")-3)))
+                                                    first=True
+                                                    for line in textwrap.wrap(gloss, wraplength):
+                                                        if first==False:
+                                                            collapsableRow = []
+                                                            collapsableRow.append(GLOSS_DISPLAY(' '*(len(lemma + "              ")-3)))
                 
-                                                    first=False
-                                                    collapsableRow.append(GLOSS_DISPLAY(line))
-                                                    collapsableSection.append(collapsableRow)
+                                                        first=False
+                                                        collapsableRow.append(GLOSS_DISPLAY(line))
+                                                        collapsableSection.append(collapsableRow)
                                             
-                                            collapsableSectionKey = "COLLAPSE_" + translated_synsetId + "_" + entry["synsetId"] + "|" + relation_type + sense
-                                            translated_layout.append([Collapsible(collapsableSection, collapsableSectionKey, title=" " + relation_type + " relations for " + senses[sense]["word"], arrows=("–", "+"), collapsed = True)])
+                                            if collapsableSection!=[]:
+                                                collapsableSectionKey = "COLLAPSE_" + translated_synsetId + "_" + entry["synsetId"] + "|" + relation_type + sense
+                                                translated_layout.append([Collapsible(collapsableSection, collapsableSectionKey, title=" " + relation_type + " relations for " + senses[sense]["word"], arrows=("–", "+"), collapsed = True)])
                             
                         else:
                             
                             # print("Not lexicalized, ",translated_synsetId)
-                            lexical_gap=True
+                            untranslatable=True
             
             
             if "relations" in synsets[entry["synsetId"]]:
@@ -612,52 +1114,52 @@ while True:
 
                     collapsableSection=[]
                     for relation_target in synsets[entry["synsetId"]]["relations"][relation_type]:
-
-                        collapsableRow=[sg.Text("              ", font="Helvetica 12 bold")]
-                        lemmaList = synsets[relation_target]["lemmas"]
-                        initial_row_size=len("              ")
+                        
+                        if synsets[relation_target]["lexicalized"]=="true":
+                            collapsableRow=[sg.Text("              ", font="Helvetica 12 bold")]
+                            lemmaList = synsets[relation_target]["lemmas"]
+                            initial_row_size=len("              ")
                                         
-                        for lemma in lemmaList:
-                            initial_row_size+=(len(lemma)+3)
+                            for lemma in lemmaList:
+                                initial_row_size+=(len(lemma)+3)
                                             
-                            lemmaKey = "LEMMA:" + lemma + "_" + entry["synsetId"]
-                            collapsableRow = collapsableRow + LText(lemma, lemmaKey, enable_events = True, font='Helvetica 12 bold', text_color='blue')
-                                        
-                        gloss = synsets[relation_target]["gloss"]
+                                lemmaKey = "LEMMA:" + lemma + "_" + entry["synsetId"]
+                                collapsableRow = collapsableRow + LText(lemma, lemmaKey, enable_events = True, font='Helvetica 12 bold', text_color='blue')
 
+                            gloss = synsets[relation_target]["gloss"]
 
-                        if initial_row_size > window.size[0]/(5*10):
-                            wraplength=int((window.size[0]/(2*11)) - len("              ")-10)
+                            if initial_row_size > window.size[0]/(5*10):
+                                wraplength=int((window.size[0]/(2*11)) - len("              ")-10)
 
-                            collapsableSection.append(collapsableRow)
-                            for line in textwrap.wrap(gloss, wraplength):
-                                collapsableRow = []
-                                collapsableRow.append(GLOSS_DISPLAY("              " + "  " + line))
                                 collapsableSection.append(collapsableRow)
-
-                        else:    
-                            wraplength=int(window.size[0]/(2*11))-(initial_row_size)-6
-                            if wraplength<5:
-                                wraplength=5
-
-                            first=True
-                            for line in textwrap.wrap(gloss, wraplength):
-                                if first==False:
+                                for line in textwrap.wrap(gloss, wraplength):
                                     collapsableRow = []
-                                    collapsableRow.append(GLOSS_DISPLAY(' '*(initial_row_size-6)))
-                
-                                first=False
-                                collapsableRow.append(GLOSS_DISPLAY(line))
-                                collapsableSection.append(collapsableRow)
+                                    collapsableRow.append(GLOSS_DISPLAY("              " + "  " + line))
+                                    collapsableSection.append(collapsableRow)
 
-                    collapsableSectionKey = "COLLAPSE_" + "_" + entry["synsetId"] + "|" + relation_type
-                    entry_layout.append([Collapsible(collapsableSection, collapsableSectionKey, title=" " + relation_type + " relations", arrows=("–", "+"), collapsed = True)])
+                            else:    
+                                wraplength=int(window.size[0]/(2*11))-(initial_row_size)-6
+                                if wraplength<5:
+                                    wraplength=5
+
+                                first=True
+                                for line in textwrap.wrap(gloss, wraplength):
+                                    if first==False:
+                                        collapsableRow = []
+                                        collapsableRow.append(GLOSS_DISPLAY(' '*(initial_row_size-6)))
+                
+                                    first=False
+                                    collapsableRow.append(GLOSS_DISPLAY(line))
+                                    collapsableSection.append(collapsableRow)
+                    if collapsableSection!=[]:
+                        collapsableSectionKey = "COLLAPSE_" + "_" + entry["synsetId"] + "|" + relation_type
+                        entry_layout.append([Collapsible(collapsableSection, collapsableSectionKey, title=" " + relation_type + " relations", arrows=("–", "+"), collapsed = True)])
 
             if "senses" in synsets[entry["synsetId"]]:
 
                 for sense in synsets[entry["synsetId"]]["senses"]:
                     # print("synset_sense: " + senses[sense]["word"] + " - " + sense)
-                    if "relations" in senses[sense]:
+                    if "relations" in senses[sense] and senses[sense]["status"]!="deleted":
                         for relation_type in senses[sense]["relations"]:
                             # print(relation_type+str(senses[sense]["relations"][relation_type]))
                             collapsableSection=[]
@@ -666,29 +1168,29 @@ while True:
 
                                 # print(relation_target)
                                 # print("translatedsynsetId: "+translated_synsetId)
-                                                
-                                collapsableRow=[sg.Text("              ", font="Helvetica 12 bold")]
-                                lemma=senses[relation_target]["word"]
-                                lemmaKey = "LEMMA:" + lemma + "_" + relation_target + "_" + sense + "_" + entry["synsetId"]
-                                collapsableRow = collapsableRow + LText(lemma, lemmaKey, enable_events = True, font='Helvetica 12 bold', text_color='blue')
-                                gloss = synsets[senses[relation_target]["synsetId"]]["gloss"]
+                                if senses[relation_target]["status"]!="deleted":       
+                                    collapsableRow=[sg.Text("              ", font="Helvetica 12 bold")]
+                                    lemma=senses[relation_target]["word"]
+                                    lemmaKey = "LEMMA:" + lemma + "_" + relation_target + "_" + sense + "_" + entry["synsetId"]
+                                    collapsableRow = collapsableRow + LText(lemma, lemmaKey, enable_events = True, font='Helvetica 12 bold', text_color='blue')
+                                    gloss = synsets[senses[relation_target]["synsetId"]]["gloss"]
 
-                                wraplength=int(window.size[0]/(2*11))-len("              " + lemma)-10
-                                if wraplength<5:
-                                    wraplength=5
+                                    wraplength=int(window.size[0]/(2*11))-len("              " + lemma)-10
+                                    if wraplength<5:
+                                        wraplength=5
 
-                                first=True
-                                for line in textwrap.wrap(gloss, wraplength):
-                                    if first==False:
-                                        collapsableRow = []
-                                        collapsableRow.append(GLOSS_DISPLAY(' '*(len(lemma + "              ")-3)))
-                
-                                    first=False
-                                    collapsableRow.append(GLOSS_DISPLAY(line))
-                                    collapsableSection.append(collapsableRow)
-                                            
-                            collapsableSectionKey = "COLLAPSE_" + entry["synsetId"] + "|" + relation_type + sense
-                            entry_layout.append([Collapsible(collapsableSection, collapsableSectionKey, title=" " + relation_type + " relations for " + senses[sense]["word"], arrows=("–", "+"), collapsed = True)])
+                                    first=True
+                                    for line in textwrap.wrap(gloss, wraplength):
+                                        if first==False:
+                                            collapsableRow = []
+                                            collapsableRow.append(GLOSS_DISPLAY(' '*(len(lemma + "              ")-3)))
+    
+                                        first=False
+                                        collapsableRow.append(GLOSS_DISPLAY(line))
+                                        collapsableSection.append(collapsableRow)
+                            if collapsableSection!=[]:              
+                                collapsableSectionKey = "COLLAPSE_" + entry["synsetId"] + "|" + relation_type + sense
+                                entry_layout.append([Collapsible(collapsableSection, collapsableSectionKey, title=" " + relation_type + " relations for " + senses[sense]["word"], arrows=("–", "+"), collapsed = True)])
             # if entry["relations"]:
             #     for reltype in entry["relations"]:
             #         collapsableSection = []
@@ -756,10 +1258,10 @@ while True:
             #         entry_layout.append([Collapsible(collapsableSection, collapsableSectionKey, title=" " + reltype + " relations", arrows=("–", "+"), collapsed = True)])
     
             translated_column_key=""
-            if lexical_gap:
+            if untranslatable:
 
-                Lexical_gap_info=sg.Button("ℹ", key="Lexical_gap_info_" + entry["synsetId"] + "_" + translated_synsetId, pad=((0,3),(3,3)))
-                translated_layout.append([sg.Text("Lexical gap", font="Helvetica 12"), Lexical_gap_info])
+                Untranslatable_info=sg.Button("ℹ", key="Untranslatable_info_" + entry["synsetId"] + "_" + translated_synsetId, pad=((0,3),(3,3)))
+                translated_layout.append([sg.Text("Untranslatable", font="Helvetica 12"), Untranslatable_info])
                 
                 Lexical_gap_button=sg.Button("Add word", key="Lexicalize_synset_" + entry["synsetId"] + "_" + translated_synsetId)
 
@@ -768,28 +1270,33 @@ while True:
 
                 translated_layout.append([sg.Text("Missing translation", font="Helvetica 12")])
                 
-                Missing_translation_button=sg.Button("Add translation", key="Add_synset_translation_" + entry["synsetId"] + "_" + translated_synsetId)
-                Add_lexical_gap_button=sg.Button("Add lexical gap",key="Add_lexical_gap_" + entry["synsetId"] + "_" + translated_synsetId, pad=((3,0),(3,3)))
-                Lexical_gap_info=sg.Button("ℹ", key="Lexical_gap_info_" + entry["synsetId"] + "_" + translated_synsetId, pad=((0,3),(3,3)))
+                Missing_translation_button=sg.Button("Add translation", key="Add_synset_translation_" + entry["synsetId"] + "_" + target_code)
+                Add_lexical_gap_button=sg.Button("Add lexical gap",key="Add_lexical_gap_" + entry["synsetId"] + "_" + target_code, pad=((3,0),(3,3)))
+                Lexical_gap_info=sg.Button("ℹ", key="Lexical_gap_info_" + entry["synsetId"] + "_" + target_code, pad=((0,3),(3,3)))
 
                 translated_layout.append([Missing_translation_button, Add_lexical_gap_button, Lexical_gap_info])
             elif not (same_language or not tranlation_present):
 
-                Correction_button_translation=sg.Button("Correct word", key="Correct_sense_of_synset_" + entry["synsetId"] + "_" + translated_synsetId)
+                #Correction_button_translation=sg.Button("Correct word", key="Correct_sense_of_synset_" + entry["synsetId"] + "_" + translated_synsetId)
                 Gloss_correction_button_tranlslation=sg.Button("Correct gloss", key="Correct_gloss_" + entry["synsetId"] + "_" + translated_synsetId)
                 Add_synonym_button_translation=sg.Button("Add synonym", key="Add_sense_to_synset_" + entry["synsetId"] + "_" + translated_synsetId)
-                Remove_synonym_button_translation=sg.Button("Remove synonym", key="Remove_sense_from_synset_" + entry["synsetId"] + "_" + translated_synsetId)
+                buttonrow=[Gloss_correction_button_tranlslation, Add_synonym_button_translation]
+                if  len(synsets[translated_synsetId]["lemmas"])>1:
+                    Remove_synonym_button_translation=sg.Button("Remove synonym", key="Remove_sense_from_synset_" + entry["synsetId"] + "_" + translated_synsetId)
+                    buttonrow.append(Remove_synonym_button_translation)
                 To_lexical_gap_button=sg.Button("Change to lexical gap", key="Delexicalize_" + entry["synsetId"] + "_" + translated_synsetId)
-
-                translated_layout.append([Correction_button_translation, Gloss_correction_button_tranlslation, Add_synonym_button_translation, Remove_synonym_button_translation, To_lexical_gap_button])
+                buttonrow.append(To_lexical_gap_button)
+                translated_layout.append(buttonrow)
 
             
-            Correction_button=sg.Button("Correct word", key="Correct_sense_of_synset_" + entry["synsetId"])
+            #Correction_button=sg.Button("Correct word", key="Correct_sense_of_synset_" + entry["synsetId"])
             Gloss_correction_button=sg.Button("Correct gloss", key="Correct_gloss_" + entry["synsetId"])
             Add_synonym_button=sg.Button("Add synonym", key="Add_sense_to_synset_" + entry["synsetId"])
-            Remove_synonym_button=sg.Button("Remove synonym", key="Remove_sense_from_synset_" + entry["synsetId"])
-
-            entry_layout.append([Correction_button, Gloss_correction_button, Add_synonym_button, Remove_synonym_button])
+            buttonrow=[Gloss_correction_button, Add_synonym_button]
+            if  len(synsets[entry["synsetId"]]["lemmas"])>1:
+                Remove_synonym_button=sg.Button("Remove synonym", key="Remove_sense_from_synset_" + entry["synsetId"])
+                buttonrow.append(Remove_synonym_button)
+            entry_layout.append(buttonrow)
             
             if translated_synsetId!="":
                 translated_column_key="column_"+translated_synsetId+"_"+entry["synsetId"]
