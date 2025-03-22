@@ -76,16 +76,20 @@ class SaxHandler(xml.sax.ContentHandler):
             if synset["ili"][-1] != 'n' and synset["ili"][-1] !='v' and synset["ili"][-1] !='a' and synset["ili"][-1] !='r':
                 if synset["ili"] in synsets:
                     synsets[synset["ili"]][langCode[len(langCode)-1]]=synsetId
+                else:
+                    synsets[synset["ili"]]={}
+                    synsets[synset["ili"]][langCode[len(langCode)-1]]=synsetId
 
             self.currentSynset = synsetId
-            if synset["lexicalized"]=="true":
+            if synset["lexicalized"]!="false":
                 synset["pos"] = attrs.getValue("partOfSpeech")
             if synsetId not in synsets:
                 synsets[synsetId] = synset
             else:
                 synsets[synsetId]["ili"] = synset["ili"]
                 synsets[synsetId]["lexicalized"] = synset["lexicalized"]
-                synsets[synsetId]["pos"] = synset["pos"]
+                if synset["lexicalized"]!="false":
+                    synsets[synsetId]["pos"] = synset["pos"]
         elif name == "Definition":
             synsets[self.currentSynset]["gloss"] = "[" + attrs.getValue("language") + "] "
             self.inDefinition = True
@@ -300,7 +304,11 @@ def add_sense(new_sense, syn_id, file):
         sense["status"]="new"
         senses[str(new_ids)]=sense
 
+        if not "lemmas" in synsets[syn_id]:
+            synsets[syn_id]["lemmas"]=[]
         synsets[syn_id]["lemmas"].append(new_sense)
+        if not "senses" in synsets[syn_id]:
+            synsets[syn_id]["senses"]=[]
         synsets[syn_id]["senses"].append(new_ids)
 
     filein.close()
@@ -310,6 +318,24 @@ def add_sense(new_sense, syn_id, file):
     os.rename(file[:-4]+"_tmp.xml",file)
 
     return 0
+
+# checks if there are any illegal characters in string
+def has_illegal_characters(string):
+
+    global illegal_charachters
+
+    found=False
+    for c in illegal_charachters:
+        if c in string:
+            found=True
+            break
+
+    return found
+
+# standerdized popup
+def illegal_characters_popup():
+    sg.popup("Illegal character present\nIllegal characters: " + str(illegal_charachters),title="Error")
+    return
 
 # ==================================================================================
 
@@ -327,6 +353,7 @@ langPublisher = []
 langDescription = []
 langProv = []
 
+illegal_charachters=['\"','=','<','>']
 
 if len(sys.argv) < 2:
     print("An LMF/XML file is needed as input argument! Exiting.")
@@ -353,8 +380,11 @@ if not os.path.exists("obj_ids.txt"):
     fileout.write("syn-0\nsen-0\nwor-0\nili-0\n")
     fileout.close()
 
+lang_selection=langName.copy()
+lang_selection.append("")
+
 layoutTop = [
-                [sg.Text('Multi-LiveLanguage Lexicon  Hub:[' + langCode[0] + ']', font='Verdana 14 bold'), sg.Text('Language to translate to:', font='Verdana 12'), sg.OptionMenu(langName, key="-Selected language-")],
+                [sg.Text('Multi-LiveLanguage Lexicon  Hub:[' + langCode[0] + ']', font='Verdana 14 bold'), sg.Text('Language to translate to:', font='Verdana 12'), sg.OptionMenu(lang_selection, key="-Selected language-")],
                 [sg.Text('Word to search for:', font='Helvetica 12'), sg.InputText(key="wordinput", font='Helvetica 12',focus = True), sg.Button('Search Lexicon', bind_return_key = True)],
                 [sg.Column([], key="content")]
             ]
@@ -408,7 +438,7 @@ while True:
         # window[column_key].set_size(newContentSize)
 
         continue
-    # synset-entry buttons
+    # synset-entry buttons ------------------------------------------------------------------------------------------------------------------------
     elif event.startswith("Correct_gloss_"):
 
         splite=event[len("Correct_gloss_"):].split("_")
@@ -420,7 +450,12 @@ while True:
         new_gloss = sg.popup_get_text("Insert gloss",default_text=synsets[syn_id]["gloss"].split("] ")[1])
         gloss_lang=synsets[syn_id]["gloss"].split("] ")[0]+"] "
 
-        if new_gloss!=None:
+        found=has_illegal_characters(new_gloss)
+
+        if found:
+            illegal_characters_popup()
+
+        if new_gloss!=None and not found:
 
             filein=open(file,"r",encoding="utf8")
             fileout=open(file[:-4]+"_tmp.xml","w",encoding="utf8")
@@ -540,10 +575,16 @@ while True:
                 unique=False
                 break
         
-        if new_sense!=None and unique:
+        found=has_illegal_characters(new_sense)
+
+        if found:
+            illegal_characters_popup()
+        
+        if new_sense!=None and unique and not found:
 
             ret_val=add_sense(new_sense, syn_id, file)
-        
+        else:
+            continue
 
     # deprecated
     # elif event.startswith("Correct_sense_of_synset_"):
@@ -718,9 +759,10 @@ while True:
         while(buffer!=""):
             
             if "<Synset id=\""+syn_id+"\"" in buffer:
-                # fileouttmp=open("tmp","w",encoding="utf8")
-                buffer=buffer.split("lexicalized=\"true\"")[0]+"lexicalized=\"false\""+buffer.split("lexicalized=\"true\"")[1]
-                # fileouttmp.close()
+
+                lexical_value=synsets[syn_id]["lexicalized"]
+                buffer=buffer.split("lexicalized=\"" + lexical_value + "\"")[0] + "lexicalized=\"false\"" + buffer.split("lexicalized=\"" + lexical_value + "\"")[1]
+
                 if not "status=\"" in buffer:
                     fileout.write(buffer[0:-2] + " status=\"modified\">\n")
                     #elif " status=\"unmodified\"" in buffer:
@@ -740,94 +782,301 @@ while True:
         os.remove(file)
         os.rename(file[:-4]+"_tmp.xml",file)
 
-    #missing translation buttons
-    elif event.startswith("Add_lexical_gap_"):
-        syn_id=event[len("Add_lexical_gap_"):].split("_")[0]
-        target_lang=event[len("Add_lexical_gap_"):].split("_")[1]
+    # missing translation / no data buttons --------------------------------------------------------------------------------------------------------
+    elif event.startswith("Set_nodata_to_untranslatable_"):
+
+        source_id=event[len("Set_nodata_to_untranslatable_"):].split("_")[0]
+        syn_lang=event[len("Set_nodata_to_untranslatable_"):].split("_")[1]
+
         filein=open(file,"r",encoding="utf8")
         fileout=open(file[:-4]+"_tmp.xml","w",encoding="utf8")
 
-        target_ili=""
-        if syn_id.split("-")[0]==langCode[0]:
-            target_ili=syn_id
+        new_ili=""
+        if syn_lang==langCode[0]:
+            new_ili="new" + str(id_next("ili",1)) + "-" + synsets[source_id]["pos"]
         else:
-            target_ili=synsets[syn_id]["ili"]
+            if source_id.split("-")[0]==langCode[0]:
+                new_ili=source_id
+            else:
+                new_ili=synsets[source_id]["ili"]
 
         buffer=filein.readline()
 
+        new_id=""
+
         target_lexicon=False
         while buffer!="":
-            if not target_lexicon and "<Lexicon " in buffer and buffer.strip().split(" ")[3].split("\"")[1]==target_lang:
+            if not target_lexicon and "<Lexicon " in buffer and buffer.strip().split(" ")[3].split("\"")[1]==syn_lang:
                 target_lexicon=True
 
             if target_lexicon and "</Lexicon>" in buffer:
-                #fileouttmp=open("tmp","w",encoding="utf8")
-
-                # to be completed
-                #new_id=id_next("syn", 1)
-                fileout.write("    <Synset id=\""+ target_lang +"-gap-"+ langCode[0] +"new" + "tmp" + "\" ili=\""+ target_ili +"\" lexicalized=\"false\" status=\"new\"></Synset>\n")
+                
+                new_id = syn_lang +"-gap-"+ langCode[0] +"new" + str(id_next("syn", 1))
+                
+                fileout.write("    <Synset id=\"" + new_id + "\" ili=\""+ new_ili +"\" lexicalized=\"false\" status=\"new\"></Synset>\n")
                 fileout.write(buffer)
 
-                #fileouttmp.close()
                 target_lexicon=False
             else:
                 fileout.write(buffer)
             buffer=filein.readline()
 
+        filein.close()
+        fileout.close()
+
+        if new_id!="":
+            new_synset={}
+
+            new_synset["ili"]=new_ili
+            new_synset["lexicalized"]="false"
+            new_synset["pos"]=synsets[source_id]["pos"]
+
+            synsets[new_id]=new_synset
+
+            source_lang=source_id.split("-")[0]
+            
+            if source_lang==langCode[0]:
+                synsets[source_id][syn_lang]=new_id
+            elif syn_lang==langCode[0]:
+                synsets[new_id][source_lang]
+            else:
+                synsets[synsets[source_id]["ili"]][syn_lang]=new_id
+        
+        
+        os.remove(file)
+        os.rename(file[:-4]+"_tmp.xml",file)
+
+    elif event.startswith("Add_synset_translation_"):
+
+        source_id=event[len("Add_synset_translation_"):].split("_")[0]
+        syn_id=event[len("Add_synset_translation_"):].split("_")[1]
+
+        syn_lang=syn_id.split("-")[0]
+
+        # deprecated
+        # if "relations" in synsets[entry_id]:
+        #     print(synsets[entry_id]["relations"])
+
+        #     for synreltype in synsets[entry_id]["relations"]:
+
+        #         target_code=syn_id.split("-")[0]
+        #         source_code=entry_id.split("-")[0]
+
+        #         print(synreltype)
+
+        #         middle_term=""
+        #         final_term=""
+        #         for synrel in synsets[entry_id]["relations"][synreltype]:
+        #             print(synrel)
+
+        #         if source_code!=langCode[0]:
+        #             middle_term=synsets[synrel["ili"]]
+        #         else:
+        #             middle_term=synrel
+
+        #         if target_code!=langCode[0]:
+        #             if target_code in synsets[middle_term]:
+        #                 final_term=synsets[middle_term][target_code]
+        #         else:
+        #             final_term=middle_term
+
+        #         if final_term!="":
+        #             print("something")
+
+
+        
+
+        new_gloss=sg.popup_get_text("Insert gloss")
+
+        found=has_illegal_characters(new_gloss)
+        if found:
+            illegal_characters_popup()
+            continue
+
+        if new_gloss==None:
+            continue
+
+        new_sense=sg.popup_get_text("Insert word")
+
+        found=has_illegal_characters(new_sense)
+        if found:
+            illegal_characters_popup()
+            continue
+
+        if new_sense==None:
+            continue
+        else:
+
+            new_id=""
+            new_ili=""
+
+            filein=open(file,"r",encoding="utf8")
+            fileout=open(file[:-4]+"_tmp.xml","w",encoding="utf8")
+
+            buffer=filein.readline()
+
+            while buffer!="":
+
+                if "<Lexicon " in buffer:
+
+                    current_language=buffer.strip().split(" ")[3].split("\"")[1]
+                    fileout.write(buffer)
+
+                    if current_language==syn_lang:
+                        buffer=filein.readline()
+                        while not buffer=="  </Lexicon>\n":
+                            fileout.write(buffer)
+
+                            buffer=filein.readline()
+
+                        new_id=syn_lang + "-synnew" + str(id_next("syn",1))
+
+                        if syn_lang==langCode[0]:
+                            new_ili="new" + str(id_next("ili",1)) + "-" + synsets[source_id]["pos"]
+                        else:
+                            if source_id.split("-")[0]==langCode[0]:
+                                new_ili=source_id
+                            else:
+                                new_ili=synsets[source_id]["ili"]
+
+                        fileout.write("    <Synset id=\"" + new_id + "\" ili=\"" + new_ili + "\" partOfSpeech=\"" + synsets[source_id]["pos"] + "\" lexicalized=\"true\" status=\"new\">\n")
+                        fileout.write("      <Definition language=\"eng\">" + new_gloss + "</Definition>\n")
+                        fileout.write("    </Synset>\n")
+                        fileout.write("  </Lexicon>\n")
+
+                else:
+                    fileout.write(buffer)
+
+                buffer=filein.readline()
+            
+            filein.close()
+            fileout.close()
+
+            os.remove(file)
+            os.rename(file[:-4]+"_tmp.xml",file)
+
+            new_synset={}
+
+            new_synset["ili"]=new_ili
+            new_synset["lexicalized"]="true"
+            new_synset["pos"]=synsets[source_id]["pos"]
+            new_synset["gloss"]=new_gloss
+
+            synsets[new_id]=new_synset
+
+            source_lang=source_id.split("-")[0]
+            
+            if source_lang==langCode[0]:
+                synsets[source_id][syn_lang]=new_id
+            elif syn_lang==langCode[0]:
+                synsets[new_id][source_lang]
+            else:
+                synsets[synsets[source_id]["ili"]][syn_lang]=new_id
+
+            add_sense(new_sense, new_id, file)
+    
+
+    elif event.startswith("Add_lexical_gap_"):
+
+        source_id=event[len("Add_lexical_gap_"):].split("_")[0]
+        syn_lang=event[len("Add_lexical_gap_"):].split("_")[1]
+
+        filein=open(file,"r",encoding="utf8")
+        fileout=open(file[:-4]+"_tmp.xml","w",encoding="utf8")
+
+        buffer=filein.readline()
+
+        new_id=""
+        new_ili=""
+        current_language=""
+        while buffer!="":
+
+            if "<Lexicon " in buffer:
+                current_language=buffer.strip().split(" ")[3].split("\"")[1]
+                fileout.write(buffer)
+
+                if current_language==syn_lang:
+                    buffer=filein.readline()
+                    while not buffer=="  </Lexicon>\n":
+                        fileout.write(buffer)
+
+                        buffer=filein.readline()
+
+                    new_id = syn_lang + "-synnew" + str(id_next("syn",1))
+                    
+                    if syn_lang==langCode[0]:
+                        new_ili="new" + str(id_next("ili",1)) + "-" + synsets[source_id]["pos"]
+                    else:
+                        if source_id.split("-")[0]==langCode[0]:
+                            new_ili=source_id
+                        else:
+                            new_ili=synsets[source_id]["ili"]
+
+                    fileout.write("    <Synset id=\"" + new_id + "\" ili=\"" + new_ili + "\" partOfSpeech=\"" + synsets[source_id]["pos"] + "\" lexicalized=\"lexical_gap\" status=\"new\"></Synset>\n")
+                    fileout.write(buffer)
+            else:
+                fileout.write(buffer)  
+
+            buffer=filein.readline()
 
         filein.close()
         fileout.close()
 
-        # os.remove(file)
-        # os.rename(file[:-4]+"_tmp.xml",file)
 
-    elif event.startswith("Add_synset_translation_"):
+        new_synset={}
+        new_synset["ili"]=new_ili
+        new_synset["lexicalized"]="lexical_gap"
+        new_synset["pos"]=synsets[source_id]["pos"]
 
-        entry_id=event[len("Add_synset_translation_"):].split("_")[0]
-        syn_id=event[len("Add_synset_translation_"):].split("_")[1]
+        synsets[new_id]=new_synset
 
-        if "relations" in synsets[entry_id]:
-            print(synsets[entry_id]["relations"])
+        source_lang=source_id.split("-")[0]
+            
+        if source_lang==langCode[0]:
+            synsets[source_id][syn_lang]=new_id
+        elif syn_lang==langCode[0]:
+            synsets[new_id][source_lang]
+        else:
+            synsets[synsets[source_id]["ili"]][syn_lang]=new_id
 
-            for synreltype in synsets[entry_id]["relations"]:
+        os.remove(file)
+        os.rename(file[:-4]+"_tmp.xml",file)
 
-                target_code=syn_id.split("-")[0]
-                source_code=entry_id.split("-")[0]
-
-                print(synreltype)
-
-                middle_term=""
-                final_term=""
-                for synrel in synsets[entry_id]["relations"][synreltype]:
-                    print(synrel)
-
-                if source_code!=langCode[0]:
-                    middle_term=synsets[synrel["ili"]]
-                else:
-                    middle_term=synrel
-
-                if target_code!=langCode[0]:
-                    if target_code in synsets[middle_term]:
-                        final_term=synsets[middle_term][target_code]
-                else:
-                    final_term=middle_term
-
-                if final_term!="":
-                    print("something")
-
-        # to be completed
-
-
-    # untranslatable buttons
+    # untranslatable buttons ---------------------------------------------------------------------------------------------------------------------
     elif event.startswith("Untranslatable_info_"):
         sg.popup("A concept is untranslatable if there is no way to translate it without using a description", title="What does untranslatable mean?")
         continue
 
-    elif event.startswith("Lexicalize_synset_"):
+    elif event.startswith("Set_to_translatable_"):
 
-        syn_id=event[len("Lexicalize_synset_"):].split("_")[1]
-        source_id=event[len("Lexicalize_synset_"):].split("_")[0]
+        syn_id=event[len("Set_to_translatable_"):].split("_")[1]
+        source_id=event[len("Set_to_translatable_"):].split("_")[0]
 
+        new_gloss=""
+        if not "gloss" in synsets[syn_id]:
+            new_gloss=sg.popup_get_text("Insert gloss")
+
+            found=has_illegal_characters(new_gloss)
+            if found:
+                illegal_characters_popup()
+                continue
+
+            if new_gloss==None:
+                continue
+
+        new_sense=""    
+        if not "senses" in synsets[syn_id]:
+            new_sense=sg.popup_get_text("Insert word")
+
+            found=has_illegal_characters(new_sense)
+            if found:
+                illegal_characters_popup()
+                continue
+
+            if new_sense==None:
+                continue
+
+        
         filein=open(file,"r",encoding="utf8")
         fileout=open(file[:-4]+"_tmp.xml","w",encoding="utf8")
         
@@ -837,21 +1086,89 @@ while True:
 
             if "Synset id=\"" + syn_id + "\"" in buffer:
 
-                if "pos" not in  synsets[syn_id]:
-                    synsets[syn_id]["pos"]=synsets[source_id]["pos"]               
+                lexical_value=synsets[syn_id]["lexicalized"]
 
-                if "gloss" not in synsets[syn_id]:
-                    synsets[syn_id]["gloss"]=sg.popup_get_text("Insert gloss")
+                buffer=buffer.split("lexicalized=\"" + lexical_value + "\"")[0] + "lexicalized=\"true\"" + buffer.split("lexicalized=\"" + lexical_value + "\"")[1]
 
-                if not "senses" in synsets[syn_id]:
-                    new_sense=sg.popup_get_text("Insert word")
+                if not "pos" in synsets[syn_id]:
+                    buffer= buffer.split("lexicalized=\"")[0] + "partOfSpeech=\"" + synsets[source_id]["pos"] + "\" lexicalized=\"" + buffer.split("lexicalized=\"")[1]
+
+                    synsets[syn_id]["pos"]=synsets[source_id]["pos"]
+
+                if "</Synset>" in buffer:
+                    buffer= buffer.split("</Synset>")[0] + "\n"
+                    
+                    fileout.write(buffer)
+                    fileout.write("      <Definition language=\"eng\">" + new_gloss + "</Definition>\n")
+                    fileout.write("    </Synset>\n")
+                else:
+                    fileout.write(buffer)
+
+            else:
+                fileout.write(buffer)
+
+            buffer=filein.readline()
+
+        filein.close()
+        fileout.close()
+        
+        os.remove(file)
+        os.rename(file[:-4]+"_tmp.xml",file)
+
+        synsets[syn_id]["lexicalized"]="true"
+
+        if new_gloss!="":
+            synsets[syn_id]["gloss"]=new_gloss
+
+        if new_sense!="":
+            add_sense(new_sense,syn_id,file)
+
+
+    elif event.startswith("To_lexical_gap"):
+
+        syn_id=event[len("To_lexical_gap"):].split("_")[1]
+        source_id=event[len("To_lexical_gap"):].split("_")[0]
+
+        filein=open(file,"r",encoding="utf8")
+        fileout=open(file[:-4]+"_tmp.xml","w",encoding="utf8")
+
+        buffer=filein.readline()
+
+        while buffer!="":
+
+            if "id=\"" + syn_id + "\"" in buffer:
+
+                lexical_value=synsets[syn_id]["lexicalized"]
+                
+                buffer=buffer.split("lexicalized=\"" + lexical_value + "\"")[0] + "lexicalized=\"lexical_gap\"" + buffer.split("lexicalized=\"" + lexical_value + "\"")[1]
+                if not "partOfSpeech" in buffer:
+                    buffer= buffer.split("lexicalized=\"")[0] + "partOfSpeech=\"" + synsets[source_id]["pos"] + "\" lexicalized=\"" + buffer.split("lexicalized=\"")[1]
+                    synsets[syn_id]["pos"]=synsets[source_id]["pos"]
+
+                #buffer=buffer.split("id=\"" + syn_id + "\"")[0] + "id=\"" + syn_id + "-lexicalgap\"" + buffer.split("id=\"" + syn_id + "\"")[1]
+
+                if not "status=\"" in buffer:
+                    buffer=buffer.split("\">")[0] + "\" status=\"modified\">" + buffer.split("\">")[1]
+
+                fileout.write(buffer)
+            else:
+                fileout.write(buffer)
 
             buffer=filein.readline()
 
         filein.close()
         fileout.close()
 
-        # to be completed
+        synsets[syn_id]["lexicalized"]="lexical_gap"
+
+
+        os.remove(file)
+        os.rename(file[:-4]+"_tmp.xml",file)
+
+    #Lexical gap buttons--------------------------------------------------------------------------------------------------------------------------
+    elif event.startswith("Lexical_gap_info_"):
+        sg.popup("A lexical gap is present when there does not exist a direct translation for a word but nonetheless does not require a description to be translated", title="What is a lexical gap?")
+        continue
 
     else:
         word = values["wordinput"].strip()
@@ -894,7 +1211,7 @@ while True:
                             relsByType[reltype] = []
                         relsByType[reltype].append(targetSynset)
 
-            if synsets[synsetId]["lexicalized"]=="true":
+            if synsets[synsetId]["lexicalized"]=="true" and not synsets[synsetId]["lexicalized"]=="lexical_gap":
                 if pos not in contentByPos:
                     contentByPos[pos] = []
                 content = {}
@@ -945,6 +1262,7 @@ while True:
 
             untranslatable=False
             missing_translation=False
+            lexical_gap=False
             tranlation_present=False
             same_language=False
             translated_synsetId=""
@@ -987,7 +1305,7 @@ while True:
                         else:
                             missing_translation=True
 
-                    if translated_synsetId != "":
+                    if translated_synsetId != "" and not synsets[translated_synsetId]["lexicalized"]=="lexical_gap":
                         if  "lemmas" in synsets[translated_synsetId] and synsets[translated_synsetId]["lexicalized"]=="true":
 
                             translated_lemmaList=", ".join(synsets[translated_synsetId]["lemmas"])
@@ -1103,9 +1421,10 @@ while True:
                             
                         else:
                             
-                            # print("Not lexicalized, ",translated_synsetId)
                             untranslatable=True
-            
+                    else:
+                        if translated_synsetId!="":
+                            lexical_gap=True
             
             if "relations" in synsets[entry["synsetId"]]:
                 # print("synset_relations: "+str(synsets[entry["synsetId"]]["relations"]))
@@ -1263,18 +1582,35 @@ while True:
                 Untranslatable_info=sg.Button("ℹ", key="Untranslatable_info_" + entry["synsetId"] + "_" + translated_synsetId, pad=((0,3),(3,3)))
                 translated_layout.append([sg.Text("Untranslatable", font="Helvetica 12"), Untranslatable_info])
                 
-                Lexical_gap_button=sg.Button("Add word", key="Lexicalize_synset_" + entry["synsetId"] + "_" + translated_synsetId)
+                Set_translatable_button=sg.Button("Add word", key="Set_to_translatable_" + entry["synsetId"] + "_" + translated_synsetId)
+                
+                Set_lexical_gap_button=sg.Button("Set to lexical gap", key="To_lexical_gap" + entry["synsetId"] + "_" + translated_synsetId, pad=((3,0),(3,3)))
+                Lexical_gap_info=sg.Button("ℹ", key="Lexical_gap_info_" + entry["synsetId"] + "_" + translated_synsetId, pad=((0,3),(3,3)))
 
-                translated_layout.append([Lexical_gap_button])
+                translated_layout.append([Set_translatable_button, Set_lexical_gap_button, Lexical_gap_info])
+                
             elif missing_translation:
 
                 translated_layout.append([sg.Text("Missing translation", font="Helvetica 12")])
                 
                 Missing_translation_button=sg.Button("Add translation", key="Add_synset_translation_" + entry["synsetId"] + "_" + target_code)
-                Add_lexical_gap_button=sg.Button("Add lexical gap",key="Add_lexical_gap_" + entry["synsetId"] + "_" + target_code, pad=((3,0),(3,3)))
-                Lexical_gap_info=sg.Button("ℹ", key="Lexical_gap_info_" + entry["synsetId"] + "_" + target_code, pad=((0,3),(3,3)))
+                Set_untranslatable_button=sg.Button("Set as untranslatable",key="Set_nodata_to_untranslatable_" + entry["synsetId"] + "_" + target_code, pad=((3,0),(3,3)))
+                Untranslatable_info=sg.Button("ℹ", key="Untranslatable_info_" + entry["synsetId"] + "_" + target_code, pad=((0,3),(3,3)))
+                Add_Lexical_gap=sg.Button("Add lexical gap", key="Add_lexical_gap_" + entry["synsetId"] + "_" + target_code, pad=((3,0),(3,3)))
+                Lexical_gap_info=sg.Button("ℹ", key="Lexical_gap_info_" + entry["synsetId"], pad=((0,3),(3,3)))
 
-                translated_layout.append([Missing_translation_button, Add_lexical_gap_button, Lexical_gap_info])
+                translated_layout.append([Missing_translation_button, Set_untranslatable_button, Untranslatable_info, Add_Lexical_gap, Lexical_gap_info])
+
+            elif lexical_gap:
+                Lexical_gap_info=sg.Button("ℹ", key="Lexical_gap_info_" + entry["synsetId"] + "_" + translated_synsetId, pad=((0,3),(3,3)))
+                translated_layout.append([sg.Text("Lexical gap", font="Helvetica 12"), Lexical_gap_info])
+
+                To_translatable_button=sg.Button("Remove lexical gap", key="Set_to_translatable_" + entry["synsetId"] + "_" + translated_synsetId)
+                To_untranslatble_button=sg.Button("Set to untranslatable", key="Delexicalize_" + entry["synsetId"] + "_" + translated_synsetId, pad=((3,0),(3,3)))
+                Untranslatable_info=sg.Button("ℹ", key="Untranslatable_info_" + entry["synsetId"] + "_" + target_code, pad=((0,3),(3,3)))
+
+                translated_layout.append([To_translatable_button, To_untranslatble_button, Untranslatable_info])
+
             elif not (same_language or not tranlation_present):
 
                 #Correction_button_translation=sg.Button("Correct word", key="Correct_sense_of_synset_" + entry["synsetId"] + "_" + translated_synsetId)
@@ -1284,8 +1620,16 @@ while True:
                 if  len(synsets[translated_synsetId]["lemmas"])>1:
                     Remove_synonym_button_translation=sg.Button("Remove synonym", key="Remove_sense_from_synset_" + entry["synsetId"] + "_" + translated_synsetId)
                     buttonrow.append(Remove_synonym_button_translation)
-                To_lexical_gap_button=sg.Button("Change to lexical gap", key="Delexicalize_" + entry["synsetId"] + "_" + translated_synsetId)
+                To_untranslatble_button=sg.Button("Set to untranslatable", key="Delexicalize_" + entry["synsetId"] + "_" + translated_synsetId, pad=((3,0),(3,3)))
+                buttonrow.append(To_untranslatble_button)
+                Untranslatable_info=sg.Button("ℹ", key="Untranslatable_info_" + entry["synsetId"] + "_" + target_code, pad=((0,3),(3,3)))
+                buttonrow.append(Untranslatable_info)
+
+                To_lexical_gap_button=sg.Button("Set to lexical gap", key="To_lexical_gap" + entry["synsetId"] + "_" + translated_synsetId, pad=((3,0),(3,3)))
+                Lexical_gap_info=sg.Button("ℹ", key="Untranslatable_info_" + entry["synsetId"] + "_" + target_code, pad=((0,3),(3,3)))
                 buttonrow.append(To_lexical_gap_button)
+                buttonrow.append(Lexical_gap_info)
+
                 translated_layout.append(buttonrow)
 
             
@@ -1316,7 +1660,7 @@ while True:
     Lexicon_info_combo=sg.Combo(langName,enable_events=True,readonly=True,key="Lexicon_info")
     layoutBottom = [sg.Text("Lexicon info:",font="Verdana 10"),Lexicon_info_combo,sg.Push(),sg.Button('Quit')]
     newLayout = [
-                 [sg.Text('Multi-LiveLanguage Lexicon  Hub:[' + langCode[0] + ']', font='Verdana 14 bold'), sg.Text('Language to translate to:', font='Verdana 12'), sg.OptionMenu(langName, key="-Selected language-",default_value=values["-Selected language-"])],
+                 [sg.Text('Multi-LiveLanguage Lexicon  Hub:[' + langCode[0] + ']', font='Verdana 14 bold'), sg.Text('Language to translate to:', font='Verdana 12'), sg.OptionMenu(lang_selection, key="-Selected language-",default_value=values["-Selected language-"])],
                  [sg.Text('Word to search for:', font='Helvetica 12'), sg.InputText(key="wordinput", font='Helvetica 12', focus=True), sg.Button('Search Lexicon', bind_return_key = True)], 
                  [sg.Text(key='-OUTPUT-', font='Helvetica 14 bold')],
                  layoutBody,
