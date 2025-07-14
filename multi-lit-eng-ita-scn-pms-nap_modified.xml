@@ -89119,6 +89119,10 @@
     </Synset>
   </Lexicon>
   <Lexicon id="livelanguage-eng-lit" label="English" language="eng" email="gabor.bella@unitn.it" license="https://creativecommons.org/licenses/by-nc-sa/4.0/" version="1.0" dc:source="Wiktionary 2022.01. by Wikimedia Foundation (http://en.wiktionary.org); CogNet 2.1 by Khuyagbaatar Batsuren, National University of Mongolia (http://cognet.ukc.disi.unitn.it); KinDiv: Kinship Diversity 1.0 by Temuulen Khishigsuren (http://ukc.disi.unitn.it/index.php/kinship/); UniMet: Universal Metonymy 1.0 by Temuulen Khishigsuren and Gábor Bella (http://ukc.disi.unitn.it/index.php/metonymy/); MorphyNet 2.0 by Gábor Bella and Khuyagbaatar Batsuren (http://ukc.disi.unitn.it/index.php/morphynet/); Princeton WordNet 2.1 by Princeton University (https://wordnet.princeton.edu/); Princeton WordNet 2.1 by Princeton University (https://wordnet.princeton.edu)" dc:description="English is a language from the Indo-European family, spoken in Eurasia. The UKC Lexicon of English is represented as a lexico-semantic network. It consists of words, word senses, synsets, as well as sense-level and synset-level relationships." dc:publisher="KnowDive - University of Trento">
+    <LexicalEntry id="eng-word-nnew12" status="new">
+      <Lemma writtenForm="cracker" partOfSpeech="n"></Lemma>
+      <Sense id="eng-sennew13" synset="eng-syn50850" status="deleted"></Sense>
+    </LexicalEntry>
     <LexicalEntry id="eng-word-n1">
       <Lemma writtenForm="entity" partOfSpeech="n"></Lemma>
       <Sense id="eng-sen1" synset="eng-syn1">
@@ -89386,6 +89390,7 @@
         <SenseRelation relType="derivation" target="eng-sen43664"></SenseRelation>
         <SenseRelation relType="cognate" target="ita-sen1565255"></SenseRelation>
       </Sense>
+      <Sense id="eng-sennew20" synset="eng-syn12804" status="new"></Sense>
     </LexicalEntry>
     <LexicalEntry id="eng-word-n27">
       <Lemma writtenForm="individual" partOfSpeech="n"></Lemma>
@@ -104489,6 +104494,7 @@
       <Lemma writtenForm="bozo" partOfSpeech="n"></Lemma>
       <Sense id="eng-sen85116" synset="eng-syn50079"></Sense>
       <Sense id="eng-sen85060" synset="eng-syn50053"></Sense>
+      <Sense id="eng-sennew12" synset="eng-syn12804" status="new"></Sense>
     </LexicalEntry>
     <LexicalEntry id="eng-word-n2554">
       <Lemma writtenForm="shaking" partOfSpeech="n"></Lemma>
@@ -147205,7 +147211,7 @@
     </LexicalEntry>
     <LexicalEntry id="eng-word-n21114">
       <Lemma writtenForm="human being" partOfSpeech="n"></Lemma>
-      <Sense id="eng-sen23128" synset="eng-syn12804"></Sense>
+      <Sense id="eng-sen23128" synset="eng-syn12804" ></Sense>
     </LexicalEntry>
     <LexicalEntry id="eng-word-a21115">
       <Lemma writtenForm="human" partOfSpeech="a"></Lemma>
@@ -187229,7 +187235,7 @@
       <Definition language="eng">a person working in the service of another (especially in the household)</Definition>
     </Synset>
     <Synset id="eng-syn52527" ili="lit-syn1465015" partOfSpeech="n" lexicalized="true">
-      <Definition language="eng">someone who serves in the armed forces; a member of a military force</Definition>
+      <Definition language="eng" status="modified">someone who serves service in the armed forces; a member of a military force</Definition>
     </Synset>
     <Synset id="eng-syn3376" ili="lit-syn1466267" partOfSpeech="n" lexicalized="true">
       <Definition language="eng">a medical procedure involving an incision with instruments; performed to repair damage or arrest disease in a living body</Definition>
@@ -272046,8 +272052,8 @@
     <Synset id="ita-syn868809" ili="lit-syn1462820" partOfSpeech="a" lexicalized="true">
       <Definition language="eng">relating to or characteristic of Christianity</Definition>
     </Synset>
-    <Synset id="ita-syn868808" ili="lit-syn1467246" partOfSpeech="n" lexicalized="true" status="modified">
-      <Definition language="ita">qualsiasi essere, vivente od estinto, membro della famiglia degli ominidi</Definition>
+    <Synset id="ita-syn868808" ili="lit-syn1467246" partOfSpeech="n" lexicalized="true">
+      <Definition language="ita" status="modified">qualsiasi essere, vivente od estinto :0, membro della famiglia degli ominidi</Definition>
     </Synset>
     <Synset id="ita-syn868810" ili="lit-syn1466433" partOfSpeech="n" lexicalized="true">
       <Definition language="eng">a religious person who believes Jesus is the Christ and who is a member of a Christian denomination</Definition>
@@ -293503,7 +293509,7 @@
     <Synset id="ita-gap-lit1467214" ili="lit-syn1467214" lexicalized="false"></Synset>
     <Synset id="ita-gap-lit1462584" ili="lit-syn1462584" lexicalized="false"></Synset>
     <Synset id="ita-gap-lit1460275" ili="lit-syn1460275" lexicalized="false"></Synset>
-    <Synset id="ita-gap-lit1460748" ili="lit-syn1460748" partOfSpeech="n" lexicalized="true" status="modified">
+    <Synset id="ita-gap-lit1460748" ili="lit-syn1460748" partOfSpeech="n" lexicalized="false">
       <Definition language="eng">gloose</Definition>
     </Synset>
     <Synset id="ita-gap-lit1462283" ili="lit-syn1462283" lexicalized="false"></Synset>
@@ -293580,6 +293586,18 @@
     </Synset>
   </Lexicon>
   <Lexicon id="livelanguage-scn-lit" label="Sicilian" language="scn" email="gabor.bella@unitn.it" license="https://creativecommons.org/licenses/by-nc-sa/4.0/" version="1.0" dc:source="Wiktionary 2022.01. by Wikimedia Foundation (http://en.wiktionary.org); CogNet 2.1 by Khuyagbaatar Batsuren, National University of Mongolia (http://cognet.ukc.disi.unitn.it); KinDiv: Kinship Diversity 1.0 by Temuulen Khishigsuren (http://ukc.disi.unitn.it/index.php/kinship/); MorphyNet 2.0 by Gábor Bella and Khuyagbaatar Batsuren (http://ukc.disi.unitn.it/index.php/morphynet/); Princeton WordNet 2.1 by Princeton University (https://wordnet.princeton.edu)" dc:description="Sicilian is a language from the Indo-European family, spoken in Eurasia. The UKC Lexicon of Sicilian is represented as a lexico-semantic network. It consists of words, word senses, synsets, as well as sense-level and synset-level relationships." dc:publisher="KnowDive - University of Trento">
+    <LexicalEntry id="scn-word-nnew16" status="new">
+      <Lemma writtenForm="daadsdas" partOfSpeech="n"></Lemma>
+      <Sense id="scn-sennew19" synset="scn-synnew16" status="new"></Sense>
+    </LexicalEntry>
+    <LexicalEntry id="scn-word-nnew14" status="new">
+      <Lemma writtenForm="pdela" partOfSpeech="n"></Lemma>
+      <Sense id="scn-sennew15" synset="scn-synnew14" status="new"></Sense>
+    </LexicalEntry>
+    <LexicalEntry id="scn-word-nnew13" status="new">
+      <Lemma writtenForm="gori" partOfSpeech="n"></Lemma>
+      <Sense id="scn-sennew14" synset="scn-synnew13" status="new"></Sense>
+    </LexicalEntry>
     <LexicalEntry id="scn-word-n2237482">
       <Lemma writtenForm="pranzu" partOfSpeech="n"></Lemma>
       <Sense id="scn-sen3250946" synset="scn-syn1866349"></Sense>
@@ -297441,8 +297459,32 @@
     <Synset id="scn-gap-lit1674028" ili="lit-syn1674028" lexicalized="false">
       <Definition language="scn">[eng] sibling</Definition>
     </Synset>
+    <Synset id="scn-synnew10" ili="lit-syn1795040" partOfSpeech="v" lexicalized="lexical_gap" status="new"></Synset>
+    <Synset id="scn-synnew11" ili="lit-syn1461699" partOfSpeech="v" lexicalized="lexical_gap" status="new"></Synset>
+    <Synset id="scn-synnew12" ili="lit-syn1868716" partOfSpeech="v" lexicalized="lexical_gap" status="new"></Synset>
+    <Synset id="scn-synnew13" ili="lit-syn1466896" partOfSpeech="n" lexicalized="true" status="new">
+      <Definition language="scn">currere</Definition>
+    </Synset>
+    <Synset id="scn-synnew14" ili="lit-syn1467162" partOfSpeech="n" lexicalized="true" status="new">
+      <Definition language="scn" status="new">chibo ci và dentro</Definition>
+    </Synset>
+    <Synset id="scn-synnew16" ili="lit-syn1467246" partOfSpeech="n" lexicalized="true" status="new">
+      <Definition language="scn" status="new">adsadsewfoi</Definition>
+    </Synset>
   </Lexicon>
   <Lexicon id="livelanguage-pms-lit" label="Piemontese" language="pms" email="gabor.bella@unitn.it" license="https://creativecommons.org/licenses/by-nc-sa/4.0/" version="1.0" dc:source="Wiktionary 2022.01. by Wikimedia Foundation (http://en.wiktionary.org); CogNet 2.1 by Khuyagbaatar Batsuren, National University of Mongolia (http://cognet.ukc.disi.unitn.it); Princeton WordNet 2.1 by Princeton University (https://wordnet.princeton.edu)" dc:description="Piemontese is a language from the Indo-European family, spoken in Eurasia. The UKC Lexicon of Piemontese is represented as a lexico-semantic network. It consists of words, word senses, synsets, as well as sense-level and synset-level relationships." dc:publisher="KnowDive - University of Trento">
+    <LexicalEntry id="pms-word-nnew15" status="new">
+      <Lemma writtenForm="ommo de servizio" partOfSpeech="n"></Lemma>
+      <Sense id="pms-sennew16" synset="pms-synnew15" status="new"></Sense>
+    </LexicalEntry>
+    <LexicalEntry id="pms-word-nnew9" status="new">
+      <Lemma writtenForm="ads" partOfSpeech="n"></Lemma>
+      <Sense id="pms-sennew9" synset="pms-synnew7" status="new"></Sense>
+    </LexicalEntry>
+    <LexicalEntry id="pms-word-nnew8" status="new">
+      <Lemma writtenForm="uommo" partOfSpeech="n"></Lemma>
+      <Sense id="pms-sennew8" synset="pms-synnew6" status="new"></Sense>
+    </LexicalEntry>
     <LexicalEntry id="pms-word-nnew7" status="new">
       <Lemma writtenForm="ommo" partOfSpeech="n"></Lemma>
       <Sense id="pms-sennew7" synset="pms-synnew4" status="new"></Sense>
@@ -297941,12 +297983,29 @@
     <Synset id="pms-syn1826532" ili="lit-syn1826507" partOfSpeech="n" lexicalized="true">
       <Definition language="eng">a facial expression characterized by turning up the corners of the mouth; usually shows pleasure or amusement</Definition>
     </Synset>
-    <Synset id="pms-synnew4" ili="lit-syn1467246" partOfSpeech="n" partOfSpeech="n" lexicalized="lexical_gap" status="new">
+    <Synset id="pms-synnew4" ili="lit-syn1467246" partOfSpeech="n" lexicalized="true" status="new">
       <Definition language="eng">fdfg</Definition>
     </Synset>
     <Synset id="pms-synnew5" ili="lit-syn1463871" partOfSpeech="n" lexicalized="lexical_gap" status="new"></Synset>
+    <Synset id="pms-synnew6" ili="lit-syn1460748" partOfSpeech="n" lexicalized="true" status="new">
+      <Definition language="eng">bla bla</Definition>
+    </Synset>
+    <Synset id="pms-synnew7" ili="lit-syn1465050" partOfSpeech="n" lexicalized="true" status="new">
+      <Definition language="eng">adsdadas</Definition>
+    </Synset>
+    <Synset id="pms-synnew15" ili="lit-syn1465015" partOfSpeech="n" lexicalized="true" status="new">
+      <Definition language="pms" status="new">algun tipo che serve</Definition>
+    </Synset>
   </Lexicon>
   <Lexicon id="livelanguage-nap-lit" label="Neapolitan" language="nap" email="gabor.bella@unitn.it" license="https://creativecommons.org/licenses/by-nc-sa/4.0/" version="1.0" dc:source="Wiktionary 2022.01. by Wikimedia Foundation (http://en.wiktionary.org); CogNet 2.1 by Khuyagbaatar Batsuren, National University of Mongolia (http://cognet.ukc.disi.unitn.it); Princeton WordNet 2.1 by Princeton University (https://wordnet.princeton.edu)" dc:description="Neapolitan is a language from the Indo-European family, spoken in Eurasia. The UKC Lexicon of Neapolitan is represented as a lexico-semantic network. It consists of words, word senses, synsets, as well as sense-level and synset-level relationships." dc:publisher="KnowDive - University of Trento">
+    <LexicalEntry id="nap-word-nnew11" status="new">
+      <Lemma writtenForm="gall" partOfSpeech="n"></Lemma>
+      <Sense id="nap-sennew11" synset="nap-synnew9" status="new"></Sense>
+    </LexicalEntry>
+    <LexicalEntry id="nap-word-nnew10" status="new">
+      <Lemma writtenForm="uooooouuu" partOfSpeech="n"></Lemma>
+      <Sense id="nap-sennew10" synset="nap-synnew8" status="new"></Sense>
+    </LexicalEntry>
     <LexicalEntry id="nap-word-v2210851">
       <Lemma writtenForm="se fermà" partOfSpeech="v"></Lemma>
       <Sense id="nap-sen3218524" synset="nap-syn1849096"></Sense>
@@ -299097,6 +299156,12 @@
     </Synset>
     <Synset id="nap-syn1893858" ili="lit-syn1467684" partOfSpeech="v" lexicalized="true">
       <Definition language="eng">obtain by purchase; acquire by means of a financial transaction</Definition>
+    </Synset>
+    <Synset id="nap-synnew8" ili="lit-syn1463871" partOfSpeech="n" lexicalized="true" status="new">
+      <Definition language="nap">popopop</Definition>
+    </Synset>
+    <Synset id="nap-synnew9" ili="lit-syn1467246" partOfSpeech="n" lexicalized="true" status="new">
+      <Definition language="nap">paasddasjdaghbbbb</Definition>
     </Synset>
   </Lexicon>
 </LexicalResource>

@@ -53,7 +53,7 @@ class SaxHandler(xml.sax.ContentHandler):
 
             if "status" in attrs.getNames():
                 senses[word["senseId"]]["status"]=attrs.getValue("status")
-                if  senses[word["senseId"]]["status"]!="deleted":
+                if  not senses[word["senseId"]]["status"].startswith("deleted"):
                     synsets[sense["synsetId"]]["lemmas"].append(self.currentLemma) 
             else:
                 senses[word["senseId"]]["status"]="unmodified"
@@ -90,10 +90,19 @@ class SaxHandler(xml.sax.ContentHandler):
                 synsets[synsetId]["lexicalized"] = synset["lexicalized"]
                 if synset["lexicalized"]!="false":
                     synsets[synsetId]["pos"] = synset["pos"]
+
+            if "status" in attrs.getNames():
+                synsets[synsetId]["status"]=attrs.getValue("status")
+            else:
+                synsets[synsetId]["status"]="unmodified"
         elif name == "Definition":
             synsets[self.currentSynset]["gloss"] = "[" + attrs.getValue("language") + "] "
             self.inDefinition = True
             # will add actuall gloss when we get to the PCDATA
+
+            if "status" in attrs.getNames():
+                synsets[self.currentSynset]["gloss_status"]=attrs.getValue("status")
+            else: synsets[self.currentSynset]["gloss_status"]="unmodified"
         elif name == "SenseRelation":
             reltype = attrs.getValue("relType")
             target = attrs.getValue("target")
@@ -145,8 +154,8 @@ class SaxHandler(xml.sax.ContentHandler):
 def POS_DISPLAY(pos):
     return SText("(" + pos + ") ", font="Helvetica 12", text_color="red")
 
-def GLOSS_DISPLAY(gloss):
-    return SText(gloss, font="Helvetica 12")
+def GLOSS_DISPLAY(gloss, background_color=None):
+    return SText(gloss, font="Helvetica 12", background_color=background_color)
 
 
 def Collapsible(layout, key, title='', arrows=("–", "+"), collapsed=False):
@@ -167,11 +176,11 @@ def Collapsible(layout, key, title='', arrows=("–", "+"), collapsed=False):
                        sg.T(title, font="Helvetica 12 italic", enable_events=True, key=key+'-TITLE-')],
                       [sg.pin(sg.Column(layout, key=key, visible=not collapsed, metadata=arrows))]], pad=(0,0))
 
-def SText(text, *positionalArgs, **keywordArgs):
-    return sg.InputText(text, *positionalArgs, **keywordArgs, size=(len(text)+1, None),  pad=0, use_readonly_for_disable=True, disabled=True, disabled_readonly_background_color="white", border_width=0)
-
 # def SText(text, *positionalArgs, **keywordArgs):
-#     return sg.Text(text, *positionalArgs, **keywordArgs,  pad=0, border_width=0)
+#     return sg.InputText(text, *positionalArgs, **keywordArgs, size=(len(text)+1, None),  pad=0, use_readonly_for_disable=True, disabled=True, disabled_readonly_background_color="white", border_width=0)
+
+def SText(text, background_color=None, *positionalArgs, **keywordArgs):
+    return sg.Text(text, *positionalArgs, **keywordArgs,  pad=0, border_width=0, background_color=background_color)
 
 
 def LText(text, k, *positionalArgs, **keywordArgs):
@@ -234,12 +243,19 @@ def add_sense(new_sense, syn_id, file):
             found_deleted=False
             while buffer!= "    </LexicalEntry>\n":
 
-                if "synset=\""+syn_id+"\"" and "status=\"deleted\"" in buffer:
+                if "synset=\"" + syn_id + "\"" and "status=\"deleted" in buffer:
+                    
+                    new_status=""
+                    if "status=\"deleted\"" in buffer:
+                        fileout.write(buffer.split(" status=\"deleted\"")[0] + buffer.split(" status=\"deleted\"")[1])
+                        new_status="unmodified"
 
-                    fileout.write(buffer.split("status=\"deleted\"")[0] + "status=\"new\"" + buffer.split("status=\"deleted\"")[1])
+                    if "status=\"deleted-again\"" in buffer:
+                        fileout.write(buffer.split("status=\"deleted-again\"")[0] + "status=\"new\"" + buffer.split("status=\"deleted-again\"")[1])
+                        new_status="new"
 
                     sense_id=buffer.split("id=\"")[1].split("\"")[0]
-                    senses[sense_id]["status"]="new"
+                    senses[sense_id]["status"]=new_status
                     synsets[syn_id]["lemmas"].append(new_sense)
 
                     found_deleted=True
@@ -260,6 +276,7 @@ def add_sense(new_sense, syn_id, file):
                 sense["word"]=new_sense
                 sense["pos"]=word_pos
                 sense["synsetId"]=syn_id
+                sense["status"]="new"
                 senses[str(new_id)]=sense
 
                 synsets[syn_id]["lemmas"].append(new_sense)
@@ -319,6 +336,45 @@ def add_sense(new_sense, syn_id, file):
 
     return 0
 
+def remove_sense(r_senseId, syn_id ,file):
+
+    filein=open(file,"r",encoding="utf8")
+    fileout=open(file[:-4]+"_tmp.xml","w",encoding="utf8")
+
+    buffer=filein.readline()
+
+    new_status=""
+    while buffer!="":
+
+        if "<Sense id=\"" + r_senseId + "\"" in buffer:
+
+            # fileouttmp=open("tmp","w",encoding="utf8")
+
+            if "status=\"new\"" in buffer:
+                fileout.write(buffer.split("status=\"")[0] + "status=\"deleted-again\"" + buffer.split("status=\"")[1].split("\"")[1])
+                new_status="deleted-again"
+            else:
+                splitb=buffer.split("\">")
+                fileout.write(splitb[0] + "\" status=\"deleted\">" + splitb[1])
+                new_status="deleted"
+
+            # fileouttmp.close()
+        else:
+            fileout.write(buffer)
+                
+        buffer=filein.readline()
+
+    senses[r_senseId]["status"]=new_status
+    synsets[syn_id]["lemmas"].remove(senses[r_senseId]["word"])
+
+    filein.close()
+    fileout.close()
+
+    os.remove(file)
+    os.rename(file[:-4]+"_tmp.xml",file)
+
+    return 0
+
 # checks if there are any illegal characters in string
 def has_illegal_characters(string):
 
@@ -355,11 +411,14 @@ langProv = []
 
 illegal_charachters=['\"','=','<','>']
 
+visualize_modifications=False
+
 if len(sys.argv) < 2:
     print("An LMF/XML file is needed as input argument! Exiting.")
     sys.exit(1)
 
 file = sys.argv[1]
+original_file=file[:-13] + ".xml"
 
 fn = open(file, encoding="utf8")
 parser = xml.sax.make_parser()
@@ -383,8 +442,12 @@ if not os.path.exists("obj_ids.txt"):
 lang_selection=langName.copy()
 lang_selection.append("")
 
+if visualize_modifications:
+    vb_color="green"
+else: vb_color="red"
+
 layoutTop = [
-                [sg.Text('Multi-LiveLanguage Lexicon  Hub:[' + langCode[0] + ']', font='Verdana 14 bold'), sg.Text('Language to translate to:', font='Verdana 12'), sg.OptionMenu(lang_selection, key="-Selected language-")],
+                [sg.Text('Multi-LiveLanguage Lexicon  Hub:[' + langCode[0] + ']', font='Verdana 14 bold'), sg.Text('Language to translate to:', font='Verdana 12'), sg.OptionMenu(lang_selection, key="-Selected language-"), sg.Button("Visualize modifications",key="-Visualize_modifications-", button_color=vb_color)],
                 [sg.Text('Word to search for:', font='Helvetica 12'), sg.InputText(key="wordinput", font='Helvetica 12',focus = True), sg.Button('Search Lexicon', bind_return_key = True)],
                 [sg.Column([], key="content")]
             ]
@@ -399,6 +462,8 @@ layout = [ layoutTop,
            layoutBottom,
            #[Collapsible(section1, SEC1_KEY,  'Section 1', collapsed=True)]
          ]
+
+word=""
             
 window = sg.Window('LiveLanguage Lexicon View', layout, resizable = True,finalize=True)
 window.maximize()
@@ -438,6 +503,13 @@ while True:
         # window[column_key].set_size(newContentSize)
 
         continue
+    elif(event.startswith("-Visualize_modifications-")):
+        if visualize_modifications:
+            visualize_modifications=False
+        else: visualize_modifications=True
+
+        word = values["wordinput"].strip()
+
     # synset-entry buttons ------------------------------------------------------------------------------------------------------------------------
     elif event.startswith("Correct_gloss_"):
 
@@ -450,37 +522,41 @@ while True:
         new_gloss = sg.popup_get_text("Insert gloss",default_text=synsets[syn_id]["gloss"].split("] ")[1])
         gloss_lang=synsets[syn_id]["gloss"].split("] ")[0]+"] "
 
+        if new_gloss==None:
+            continue
+        
+        new_gloss=new_gloss.strip()
+
         found=has_illegal_characters(new_gloss)
 
         if found:
             illegal_characters_popup()
 
-        if new_gloss!=None and not found:
+        if not found:
 
             filein=open(file,"r",encoding="utf8")
             fileout=open(file[:-4]+"_tmp.xml","w",encoding="utf8")
             buffer=filein.readline()
+            gloss_new_status=""
             while(buffer!=""):
             
                 if "Synset id=\"" + syn_id + "\"" in buffer:
                 
-                    fileouttmp=open("tmp","w")
                 
-                    if not "status=\"" in buffer:
-                        fileouttmp.write(buffer[0:-2] + " status=\"modified\">\n")
-                        fileout.write(buffer[0:-2] + " status=\"modified\">\n")
+                    # if not "status=\"" in buffer:
+                    #     fileout.write(buffer[0:-2] + " status=\"modified\">\n")
                     #elif " status=\"unmodified\"" in buffer:
-                    else:
-                        fileouttmp.write(buffer)
-                        fileout.write(buffer)
+                    # else:
+                    fileout.write(buffer)
 
                     buffer=filein.readline()
-
-                    fileouttmp.write(buffer.split(">")[0]+ ">" + new_gloss + "</Definition>\n")
-                    fileout.write(buffer.split(">")[0]+ ">" + new_gloss + "</Definition>\n")
+                    
+                    if "status=\"new\"" in buffer or "status=\"modified\"" in buffer:
+                        fileout.write(buffer.split(">")[0]+ ">" + new_gloss + "</Definition>\n")
+                    else:
+                        fileout.write(buffer.split(">")[0]+ " status=\"modified\">" + new_gloss + "</Definition>\n")
+                        gloss_new_status="modified"
                 
-                
-                    fileouttmp.close()
                 else:
                     fileout.write(buffer)
                     
@@ -489,6 +565,8 @@ while True:
             filein.close()
             fileout.close()
             synsets[syn_id]["gloss"]=gloss_lang + new_gloss
+            if gloss_new_status!="":
+                synsets[syn_id]["gloss_status"]="modified"
 
             os.remove(file)
             os.rename(file[:-4]+"_tmp.xml",file)
@@ -510,7 +588,7 @@ while True:
         row=[]
         for sense in synsets[syn_id]["senses"]:
 
-            if senses[sense]["status"]!="deleted":
+            if not senses[sense]["status"].startswith("deleted"):
                 row.append(sg.Button(senses[sense]["word"],key=sense))
 
         remove_sense_layout.append(row)
@@ -521,37 +599,8 @@ while True:
 
         if(r_s_event!=None):
 
-            filein=open(file,"r",encoding="utf8")
-            fileout=open(file[:-4]+"_tmp.xml","w",encoding="utf8")
+            remove_sense(r_s_event, syn_id, file)
 
-            buffer=filein.readline()
-
-            while buffer!="":
-
-                if "<Sense id=\"" + r_s_event + "\"" in buffer:
-
-                    # fileouttmp=open("tmp","w",encoding="utf8")
-
-                    if "status=\"" in buffer:
-                        fileout.write(buffer.split("status=\"")[0] + "status=\"deleted\"" + buffer.split("status=\"")[1].split("\"")[1])
-                    else:
-                        splitb=buffer.split("\">")
-                        fileout.write(splitb[0] + "\" status=\"deleted\">" + splitb[1])
-
-                    # fileouttmp.close()
-                else:
-                    fileout.write(buffer)
-                
-                buffer=filein.readline()
-
-            senses[r_s_event]["status"]="deleted"
-            synsets[syn_id]["lemmas"].remove(senses[r_s_event]["word"])
-
-            filein.close()
-            fileout.close()
-
-            os.remove(file)
-            os.rename(file[:-4]+"_tmp.xml",file)
         else:
             continue
 
@@ -568,19 +617,24 @@ while True:
 
         new_sense=sg.popup_get_text("Insert new Synonym")
 
+        if new_sense==None:
+            continue
+
+        new_sense=new_sense.strip()
+
         unique=True
         for sense in synsets[syn_id]["senses"]:
 
-            if senses[sense]["word"]==new_sense and senses[sense]["status"]!="deleted":
+            if senses[sense]["word"]==new_sense and  not senses[sense]["status"].startswith("deleted"):
                 unique=False
                 break
-        
+
         found=has_illegal_characters(new_sense)
 
         if found:
             illegal_characters_popup()
         
-        if new_sense!=None and unique and not found:
+        if  unique and not found:
 
             ret_val=add_sense(new_sense, syn_id, file)
         else:
@@ -765,6 +819,7 @@ while True:
 
                 if not "status=\"" in buffer:
                     fileout.write(buffer[0:-2] + " status=\"modified\">\n")
+                    synsets[syn_id]["status"]="modified"
                     #elif " status=\"unmodified\"" in buffer:
                 else:
                     fileout.write(buffer)
@@ -887,24 +942,29 @@ while True:
         
 
         new_gloss=sg.popup_get_text("Insert gloss")
+        
+        if new_gloss==None:
+            continue
+
+        new_gloss=new_gloss.strip()
 
         found=has_illegal_characters(new_gloss)
         if found:
             illegal_characters_popup()
             continue
 
-        if new_gloss==None:
+        new_sense=sg.popup_get_text("Insert word")
+
+        if new_sense==None:
             continue
 
-        new_sense=sg.popup_get_text("Insert word")
+        new_sense=new_sense.strip()
 
         found=has_illegal_characters(new_sense)
         if found:
             illegal_characters_popup()
             continue
 
-        if new_sense==None:
-            continue
         else:
 
             new_id=""
@@ -940,7 +1000,7 @@ while True:
                                 new_ili=synsets[source_id]["ili"]
 
                         fileout.write("    <Synset id=\"" + new_id + "\" ili=\"" + new_ili + "\" partOfSpeech=\"" + synsets[source_id]["pos"] + "\" lexicalized=\"true\" status=\"new\">\n")
-                        fileout.write("      <Definition language=\"eng\">" + new_gloss + "</Definition>\n")
+                        fileout.write("      <Definition language=\"" + syn_lang + "\" status=\"new\">" + new_gloss + "</Definition>\n")
                         fileout.write("    </Synset>\n")
                         fileout.write("  </Lexicon>\n")
 
@@ -960,7 +1020,8 @@ while True:
             new_synset["ili"]=new_ili
             new_synset["lexicalized"]="true"
             new_synset["pos"]=synsets[source_id]["pos"]
-            new_synset["gloss"]=new_gloss
+            new_synset["gloss"]="[" + syn_lang + "] " + new_gloss
+            new_synset["gloss_status"]="new"
 
             synsets[new_id]=new_synset
 
@@ -1052,29 +1113,36 @@ while True:
         syn_id=event[len("Set_to_translatable_"):].split("_")[1]
         source_id=event[len("Set_to_translatable_"):].split("_")[0]
 
+        syn_lang=syn_id.split("-")[0]
+
         new_gloss=""
         if not "gloss" in synsets[syn_id]:
             new_gloss=sg.popup_get_text("Insert gloss")
+
+            if new_gloss==None:
+                continue
+
+            new_gloss=new_gloss.strip()
 
             found=has_illegal_characters(new_gloss)
             if found:
                 illegal_characters_popup()
                 continue
 
-            if new_gloss==None:
-                continue
-
         new_sense=""    
         if not "senses" in synsets[syn_id]:
             new_sense=sg.popup_get_text("Insert word")
+
+            if new_sense==None:
+                continue
+
+            new_sense=new_sense.strip()
 
             found=has_illegal_characters(new_sense)
             if found:
                 illegal_characters_popup()
                 continue
 
-            if new_sense==None:
-                continue
 
         
         filein=open(file,"r",encoding="utf8")
@@ -1099,7 +1167,7 @@ while True:
                     buffer= buffer.split("</Synset>")[0] + "\n"
                     
                     fileout.write(buffer)
-                    fileout.write("      <Definition language=\"eng\">" + new_gloss + "</Definition>\n")
+                    fileout.write("      <Definition language=\"" + syn_lang + "\" status=\"new\">" + new_gloss + "</Definition>\n")
                     fileout.write("    </Synset>\n")
                 else:
                     fileout.write(buffer)
@@ -1118,7 +1186,8 @@ while True:
         synsets[syn_id]["lexicalized"]="true"
 
         if new_gloss!="":
-            synsets[syn_id]["gloss"]=new_gloss
+            synsets[syn_id]["gloss"]= "[" + syn_lang + "] " + new_gloss
+            synsets[syn_id]["gloss_status"]="new"
 
         if new_sense!="":
             add_sense(new_sense,syn_id,file)
@@ -1149,6 +1218,7 @@ while True:
 
                 if not "status=\"" in buffer:
                     buffer=buffer.split("\">")[0] + "\" status=\"modified\">" + buffer.split("\">")[1]
+                    synsets[syn_id]["status"]="modified"
 
                 fileout.write(buffer)
             else:
@@ -1161,15 +1231,120 @@ while True:
 
         synsets[syn_id]["lexicalized"]="lexical_gap"
 
-
         os.remove(file)
         os.rename(file[:-4]+"_tmp.xml",file)
 
-    #Lexical gap buttons--------------------------------------------------------------------------------------------------------------------------
+    #Lexical gap buttons (shares most with other buttons)--------------------------------------------------------------------------------------------------------------------------
     elif event.startswith("Lexical_gap_info_"):
         sg.popup("A lexical gap is present when there does not exist a direct translation for a word but nonetheless does not require a description to be translated", title="What is a lexical gap?")
         continue
+    
+    elif event.startswith("Undo_"):
+        splitevent=event.split("_")
+        if splitevent[1]=="Sense":
 
+            undo_sense=splitevent[2]
+            status=senses[undo_sense]["status"]
+
+            if status=="deleted":
+                add_sense(senses[undo_sense]["word"], senses[undo_sense]["synsetId"], file)
+            elif status=="deleted-again":
+                add_sense(senses[undo_sense]["word"],senses[undo_sense]["synsetId"], file)
+            elif status=="new":
+                remove_sense(undo_sense, senses[undo_sense]["synsetId"], file)
+
+        elif splitevent[1]=="Gloss":
+            undo_synsetid=splitevent[2]
+
+            filein=open(original_file,"r",encoding="utf8")
+
+            buffer=filein.readline()
+            original_gloss=""
+            while buffer!="":
+                if "Synset id=\"" + undo_synsetid + "\"" in buffer:
+                    buffer=filein.readline()
+                    original_gloss=buffer.split(">")[1].split("<")[0]
+                    break
+                else:
+                    buffer=filein.readline()
+
+            filein.close()
+
+            filein=open(file,"r",encoding="utf8")
+            fileout=open(file[:-4]+"_tmp.xml","w",encoding="utf8")
+
+            buffer=filein.readline()
+            while buffer!="":
+                if "Synset id=\"" + undo_synsetid + "\"" in buffer:
+                    fileout.write(buffer)
+                    buffer=filein.readline()
+
+                    splitb=buffer.split(" status=\"modified\"")
+                    buffer=splitb[0] + splitb[1]
+
+                    buffer=buffer.split(">")[0] + ">" + original_gloss + "<" + buffer.split("<")[2]
+
+                    fileout.write(buffer)
+                    buffer=filein.readline()
+
+                else:
+                    fileout.write(buffer)
+                    buffer=filein.readline()
+
+            filein.close()
+            fileout.close()
+
+            gloss_lang=synsets[undo_synsetid]["gloss"].split("] ")[0]+"] "
+
+            synsets[undo_synsetid]["gloss"]=gloss_lang + original_gloss
+            synsets[undo_synsetid]["gloss_status"]="unmodified"
+
+            os.remove(file)
+            os.rename(file[:-4]+"_tmp.xml",file)
+
+
+        elif splitevent[1]=="Lexicalization":
+            undo_synsetid=splitevent[2]
+
+            filein=open(original_file,"r",encoding="utf8")
+
+            buffer=filein.readline()
+            original_lexicalization=""
+            while buffer!="":
+                if "Synset id=\"" + undo_synsetid + "\"" in buffer:
+                    original_lexicalization=buffer.split("lexicalized=\"")[1].split("\"")[0]
+                    break
+                else:
+                    buffer=filein.readline()
+
+            filein.close()
+
+            filein=open(file,"r",encoding="utf8")
+            fileout=open(file[:-4]+"_tmp.xml","w",encoding="utf8")
+
+            buffer=filein.readline()
+            while buffer!="":
+                if "Synset id=\"" + undo_synsetid + "\"" in buffer:
+                    splitb=buffer.split("lexicalized=\"")
+                    buffer=splitb[0] + "lexicalized=\"" + original_lexicalization + "\"" + "\"".join(splitb[1].split("\"")[1:len(splitb[1].split("\""))])
+                    splitb=buffer.split(" status=\"modified\"")
+                    buffer=splitb[0] + splitb[1]
+
+                    fileout.write(buffer)
+                    buffer=filein.readline()
+
+                else:
+                    fileout.write(buffer)
+                    buffer=filein.readline()
+
+            filein.close()
+            fileout.close()
+
+            synsets[undo_synsetid]["lexicalized"]=original_lexicalization
+            synsets[undo_synsetid]["status"]="unmodified"
+
+            os.remove(file)
+            os.rename(file[:-4]+"_tmp.xml",file)
     else:
         word = values["wordinput"].strip()
 
@@ -1232,33 +1407,111 @@ while True:
             translated_layoutRow=[]
             translated_layout=[[]]
 
-            lemmaList = ", ".join(entry["lemmas"])
-            lemmaList.strip()
+            # lemmaList = ", ".join(entry["lemmas"])
+            # lemmaList.strip()
 
-            wraplength=(window.size[0]/(2*11))
-            if wraplength<5:
-                wraplength=5
+            # wraplength=(window.size[0]/(2*11))
+            # if wraplength<5:
+            #     wraplength=5
 
-            for line in textwrap.wrap(lemmaList, wraplength):
-                layoutRow = []
-                layoutRow.append(SText(line, font="Helvetica 12 bold", text_color="blue"))
+            # for line in textwrap.wrap(lemmaList, wraplength):
+            #     layoutRow = []
+            #     layoutRow.append(SText(line, font="Helvetica 12 bold", text_color="blue"))
+            #     entry_layout.append(layoutRow)
+
+            # i=1
+            # for lemma in entry["lemmas"]:
+            #     if i!=len(entry["lemmas"]):
+            #         lemma=lemma+", "
+                
+            #     bg_color=None
+
+                # layoutRow.append(SText(lemma, font="Helvetica 12 bold", text_color="blue", background_color=bg_color))
+                # i=i+1
+
+            if visualize_modifications and synsets[entry["synsetId"]]["status"]!="unmodified":
+
+                status=synsets[entry["synsetId"]]["status"]
+                if status=="modified":
+                    bg_color="yellow"
+                elif status=="new":
+                    bg_color="green"
+                layoutRow.append(GLOSS_DISPLAY("Synset Lexicalization",bg_color))
+
+                if  status=="modified":
+                    layoutRow.append(sg.Button("Undo",key="Undo_Lexicalization_" + entry["synsetId"], pad=((0,3),(3,3))))
+
                 entry_layout.append(layoutRow)
+                layoutRow=[]
 
-            #debug
-            # if layoutRow[0].Size[0]>len(lemmaList)+1:
-            #     layoutRow.append(GLOSS_DISPLAY("b"))
-            # layoutRow.append(GLOSS_DISPLAY("a"))
-            
-            wraplength=int(window.size[0]/(2*10)-14)
+            i=1
+            l=len(synsets[entry["synsetId"]]["senses"])
+            wraplength=(window.size[0]/(2*11))
+            rowlength=0
+            for sense in synsets[entry["synsetId"]]["senses"]:
+
+                if not senses[sense]["status"].startswith("deleted") or visualize_modifications:
+
+                    lemma=senses[sense]["word"]
+
+                    if i!=l:
+                        lemma=lemma+", "
+
+                    bg_color=None
+                    button_length=0
+                    if visualize_modifications:
+                        if senses[sense]["status"]=="new":
+                            bg_color="green"
+                        elif senses[sense]["status"]=="deleted":
+                            bg_color="red"
+                        elif senses[sense]["status"]=="deleted-again":
+                            bg_color="purple"
+
+                        if senses[sense]["status"]!="unmodified":
+                            Undo_button=sg.Button("Undo",key="Undo_Sense_" + sense + "_" + entry["synsetId"], pad=((0,3),(3,3)))
+                            button_length=5
+
+                    if rowlength + len(lemma) + button_length > wraplength:
+                        entry_layout.append(layoutRow)
+                        layoutRow=[]
+                        rowlength=0
+
+                    layoutRow.append(SText(lemma, font="Helvetica 12 bold", text_color="blue", background_color=bg_color))
+                    if visualize_modifications and senses[sense]["status"]!="unmodified": layoutRow.append(Undo_button)
+                    rowlength+=len(lemma) + button_length
+                i=i+1
+
+
+            entry_layout.append(layoutRow)
+
+            bg_color=None
+            if "gloss_status" in synsets[entry["synsetId"]] and visualize_modifications:
+                if synsets[entry["synsetId"]]["gloss_status"]=="modified":
+                    bg_color="yellow"
+                elif synsets[entry["synsetId"]]["gloss_status"]=="new":
+                    bg_color="green"
+
+            wraplength=int(window.size[0]/(2*10)-10)
             if wraplength<5:
                 wraplength=5
 
+            Undo_button=sg.Button("Undo",key="Undo_Gloss_" + entry["synsetId"], pad=((0,3),(3,3)))
+            added_button=False
+            if synsets[entry["synsetId"]]["gloss_status"]!="unmodified" and synsets[entry["synsetId"]]["gloss_status"]!="new":
+                add_button=True
+            else: add_button=False
             for line in textwrap.wrap(entry["gloss"],wraplength):
                 
                 layoutRow = []
-                layoutRow.append(GLOSS_DISPLAY(line))
+                layoutRow.append(GLOSS_DISPLAY(line, background_color=bg_color))
                 entry_layout.append(layoutRow)
 
+                if visualize_modifications and add_button and len(line) < wraplength-6:
+                    layoutRow.append(Undo_button)
+                    added_button=True
+
+            if visualize_modifications and add_button and not added_button:
+                entry_layout.append([Undo_button])
 
             untranslatable=False
             missing_translation=False
@@ -1305,30 +1558,104 @@ while True:
                         else:
                             missing_translation=True
 
+                        if translated_synsetId != "" and visualize_modifications and synsets[translated_synsetId]["status"]!="unmodified":
+
+                            status=synsets[translated_synsetId]["status"]
+                            if status=="modified":
+                                bg_color="yellow"
+                            elif status=="new":
+                                bg_color="green"
+                            translated_layoutRow.append(GLOSS_DISPLAY("Synset Lexicalization",bg_color))
+
+                            if  status=="modified":
+                                translated_layoutRow.append(sg.Button("Undo",key="Undo_Lexicalization_" + translated_synsetId + "_" + entry["synsetId"], pad=((0,3),(3,3))))
+
+                            translated_layout.append(translated_layoutRow)
+                            translated_layoutRow=[]
+
                     if translated_synsetId != "" and not synsets[translated_synsetId]["lexicalized"]=="lexical_gap":
                         if  "lemmas" in synsets[translated_synsetId] and synsets[translated_synsetId]["lexicalized"]=="true":
 
-                            translated_lemmaList=", ".join(synsets[translated_synsetId]["lemmas"])
+                            
 
+                            # translated_lemmaList=", ".join(synsets[translated_synsetId]["lemmas"])
+
+                            # wraplength=(window.size[0]/(2*11))
+                            # if wraplength<5:
+                            #     wraplength=5
+
+                            # for line in textwrap.wrap(translated_lemmaList, wraplength):
+                            #     translated_layoutRow = []
+                            #     translated_layoutRow.append(SText(line, font="Helvetica 12 bold", text_color="blue"))
+                            #     translated_layout.append(translated_layoutRow)
+
+                            i=1
+                            l=len(synsets[translated_synsetId]["senses"])
                             wraplength=(window.size[0]/(2*11))
-                            if wraplength<5:
-                                wraplength=5
+                            rowlength=0
+                            for sense in synsets[translated_synsetId]["senses"]:
 
-                            for line in textwrap.wrap(translated_lemmaList, wraplength):
-                                translated_layoutRow = []
-                                translated_layoutRow.append(SText(line, font="Helvetica 12 bold", text_color="blue"))
-                                translated_layout.append(translated_layoutRow)
+                                if senses[sense]["status"]!="deleted" or visualize_modifications:
 
+                                    lemma=senses[sense]["word"]
+
+                                    if i!=l:
+                                        lemma=lemma+", "
+
+                                    bg_color=None
+                                    button_length=0
+                                    if visualize_modifications:
+                                        if senses[sense]["status"]=="new":
+                                            bg_color="green"
+                                        elif senses[sense]["status"]=="deleted":
+                                            bg_color="red"
+                                        elif senses[sense]["status"]=="deleted-again":
+                                            bg_color="purple"
+
+                                    if senses[sense]["status"]!="unmodified":
+                                        Undo_button=sg.Button("Undo",key="Undo_Sense_" + sense + "_" + translated_synsetId, pad=((0,3),(3,3)))
+                                        button_length=5
+
+                                    if rowlength + len(lemma) + button_length > wraplength:
+                                        translated_layout.append(translated_layoutRow)
+                                        translated_layoutRow=[]
+                                        rowlength=0
+
+                                    translated_layoutRow.append(SText(lemma, font="Helvetica 12 bold", text_color="blue", background_color=bg_color))
+                                    if visualize_modifications and senses[sense]["status"]!="unmodified": translated_layoutRow.append(Undo_button)
+                                    rowlength+=len(lemma) + button_length
+                                i=i+1
+
+                            translated_layout.append(translated_layoutRow)
+
+                            bg_color=None
+                            if "gloss_status" in synsets[translated_synsetId] and visualize_modifications:
+                                if synsets[translated_synsetId]["gloss_status"]=="modified":
+                                    bg_color="yellow"
+                                elif synsets[translated_synsetId]["gloss_status"]=="new":
+                                    bg_color="green"
 
                             wraplength=int(window.size[0]/(2*10))
                             if wraplength<5:
                                 wraplength=5
-                            
+
+                            Undo_button=sg.Button("Undo",key="Undo_Gloss_" + translated_synsetId + "_" + entry["synsetId"], pad=((0,3),(3,3)))
+                            added_button=False
+                            if synsets[translated_synsetId]["gloss_status"]!="unmodified" and synsets[translated_synsetId]["gloss_status"]!="new":
+                                add_button=True
+                            else: add_button=False
                             for line in textwrap.wrap(synsets[translated_synsetId]["gloss"],wraplength):
                             
                                 translated_layoutRow = []
-                                translated_layoutRow.append(GLOSS_DISPLAY(line))
+                                translated_layoutRow.append(GLOSS_DISPLAY(line,bg_color))
                                 translated_layout.append(translated_layoutRow)
+
+                                if visualize_modifications and add_button and len(line) < wraplength-6:
+                                    translated_layoutRow.append(Undo_button)
+                                    added_button=True
+
+                            if visualize_modifications and add_button and not added_button:
+                                entry_layout.append([Undo_button])
 
                             tranlation_present=True
 
@@ -1385,7 +1712,7 @@ while True:
 
                                 for sense in synsets[translated_synsetId]["senses"]:
                                     #print("synset_senses: "+sense)
-                                    if "relations" in senses[sense] and senses[sense]["status"]!="deleted":
+                                    if "relations" in senses[sense] and not senses[sense]["status"].startswith("deleted"):
                                         for relation_type in senses[sense]["relations"]:
                                             #print(relation_type+str(senses[sense]["relations"][relation_type]))
                                             collapsableSection=[]
@@ -1394,7 +1721,7 @@ while True:
 
                                                 # print(relation_target)
                                                 # print("translatedsynsetId: "+translated_synsetId)
-                                                if senses[relation_target]["status"]!="deleted":
+                                                if not senses[relation_target]["status"].startswith("deleted"):
                                                     collapsableRow=[sg.Text("              ", font="Helvetica 12 bold")]
                                                     lemma=senses[relation_target]["word"]
                                                     lemmaKey = "LEMMA:" + lemma + "_" + relation_target + "_" + sense + "_" + translated_synsetId + "_" + entry["synsetId"]
@@ -1487,7 +1814,7 @@ while True:
 
                                 # print(relation_target)
                                 # print("translatedsynsetId: "+translated_synsetId)
-                                if senses[relation_target]["status"]!="deleted":       
+                                if not senses[relation_target]["status"].startswith("deleted"):
                                     collapsableRow=[sg.Text("              ", font="Helvetica 12 bold")]
                                     lemma=senses[relation_target]["word"]
                                     lemmaKey = "LEMMA:" + lemma + "_" + relation_target + "_" + sense + "_" + entry["synsetId"]
@@ -1620,15 +1947,17 @@ while True:
                 if  len(synsets[translated_synsetId]["lemmas"])>1:
                     Remove_synonym_button_translation=sg.Button("Remove synonym", key="Remove_sense_from_synset_" + entry["synsetId"] + "_" + translated_synsetId)
                     buttonrow.append(Remove_synonym_button_translation)
-                To_untranslatble_button=sg.Button("Set to untranslatable", key="Delexicalize_" + entry["synsetId"] + "_" + translated_synsetId, pad=((3,0),(3,3)))
-                buttonrow.append(To_untranslatble_button)
-                Untranslatable_info=sg.Button("ℹ", key="Untranslatable_info_" + entry["synsetId"] + "_" + target_code, pad=((0,3),(3,3)))
-                buttonrow.append(Untranslatable_info)
+                
+                if translated_synsetId.split("-")[0]!=langCode[0]:
+                    To_untranslatble_button=sg.Button("Set to untranslatable", key="Delexicalize_" + entry["synsetId"] + "_" + translated_synsetId, pad=((3,0),(3,3)))
+                    buttonrow.append(To_untranslatble_button)
+                    Untranslatable_info=sg.Button("ℹ", key="Untranslatable_info_" + entry["synsetId"] + "_" + target_code, pad=((0,3),(3,3)))
+                    buttonrow.append(Untranslatable_info)
 
-                To_lexical_gap_button=sg.Button("Set to lexical gap", key="To_lexical_gap" + entry["synsetId"] + "_" + translated_synsetId, pad=((3,0),(3,3)))
-                Lexical_gap_info=sg.Button("ℹ", key="Untranslatable_info_" + entry["synsetId"] + "_" + target_code, pad=((0,3),(3,3)))
-                buttonrow.append(To_lexical_gap_button)
-                buttonrow.append(Lexical_gap_info)
+                    To_lexical_gap_button=sg.Button("Set to lexical gap", key="To_lexical_gap" + entry["synsetId"] + "_" + translated_synsetId, pad=((3,0),(3,3)))
+                    Lexical_gap_info=sg.Button("ℹ", key="Untranslatable_info_" + entry["synsetId"] + "_" + target_code, pad=((0,3),(3,3)))
+                    buttonrow.append(To_lexical_gap_button)
+                    buttonrow.append(Lexical_gap_info)
 
                 translated_layout.append(buttonrow)
 
@@ -1659,8 +1988,11 @@ while True:
     
     Lexicon_info_combo=sg.Combo(langName,enable_events=True,readonly=True,key="Lexicon_info")
     layoutBottom = [sg.Text("Lexicon info:",font="Verdana 10"),Lexicon_info_combo,sg.Push(),sg.Button('Quit')]
+    if visualize_modifications:
+        vb_color="green"
+    else: vb_color="red"
     newLayout = [
-                 [sg.Text('Multi-LiveLanguage Lexicon  Hub:[' + langCode[0] + ']', font='Verdana 14 bold'), sg.Text('Language to translate to:', font='Verdana 12'), sg.OptionMenu(lang_selection, key="-Selected language-",default_value=values["-Selected language-"])],
+                 [sg.Text('Multi-LiveLanguage Lexicon  Hub:[' + langCode[0] + ']', font='Verdana 14 bold'), sg.Text('Language to translate to:', font='Verdana 12'), sg.OptionMenu(lang_selection, key="-Selected language-",default_value=values["-Selected language-"]), sg.Button("Visualize modifications",key="-Visualize_modifications-", button_color=vb_color)],
                  [sg.Text('Word to search for:', font='Helvetica 12'), sg.InputText(key="wordinput", font='Helvetica 12', focus=True), sg.Button('Search Lexicon', bind_return_key = True)], 
                  [sg.Text(key='-OUTPUT-', font='Helvetica 14 bold')],
                  layoutBody,
