@@ -81,8 +81,9 @@ class SaxHandler(xml.sax.ContentHandler):
                     synsets[synset["ili"]][langCode[len(langCode)-1]]=synsetId
 
             self.currentSynset = synsetId
-            if synset["lexicalized"]!="false":
+            if "partOfSpeech" in attrs.getNames():
                 synset["pos"] = attrs.getValue("partOfSpeech")
+
             if synsetId not in synsets:
                 synsets[synsetId] = synset
             else:
@@ -282,6 +283,15 @@ def add_sense(new_sense, syn_id, file):
                 synsets[syn_id]["lemmas"].append(new_sense)
                 synsets[syn_id]["senses"].append(new_id)
 
+                word={}
+                word["senseId"] = new_id
+                word["synsetId"] = syn_id
+                word["pos"] = word_pos
+
+                if new_sense not in lemmas:
+                    lemmas[new_sense]=[]
+                lemmas[new_sense].append(word)
+
                 fileout.write(buffer)
 
         else:
@@ -312,7 +322,9 @@ def add_sense(new_sense, syn_id, file):
         word["synsetId"] = syn_id
         word["pos"] = word_pos
 
-        lemmas[new_sense]=[word]
+        if new_sense not in lemmas:
+            lemmas[new_sense]=[]
+        lemmas[new_sense].append(word)
 
         sense={}
         sense["word"]=new_sense
@@ -1022,6 +1034,7 @@ while True:
             new_synset["pos"]=synsets[source_id]["pos"]
             new_synset["gloss"]="[" + syn_lang + "] " + new_gloss
             new_synset["gloss_status"]="new"
+            new_synset["status"]="new"
 
             synsets[new_id]=new_synset
 
@@ -1158,10 +1171,15 @@ while True:
 
                 buffer=buffer.split("lexicalized=\"" + lexical_value + "\"")[0] + "lexicalized=\"true\"" + buffer.split("lexicalized=\"" + lexical_value + "\"")[1]
 
-                if not "pos" in synsets[syn_id]:
-                    buffer= buffer.split("lexicalized=\"")[0] + "partOfSpeech=\"" + synsets[source_id]["pos"] + "\" lexicalized=\"" + buffer.split("lexicalized=\"")[1]
+                if not "status" in buffer:
+                    buffer=buffer.split("\">")[0] + "\" status=\"modified\"" + ">" + buffer.split("\">")[1]
+                    synsets[syn_id]["status"]="modified"
 
+                if not "pos" in synsets[syn_id]:
                     synsets[syn_id]["pos"]=synsets[source_id]["pos"]
+
+                if not "partOfSpeech" in buffer:
+                    buffer= buffer.split("lexicalized=\"")[0] + "partOfSpeech=\"" + synsets[source_id]["pos"] + "\" lexicalized=\"" + buffer.split("lexicalized=\"")[1]
 
                 if "</Synset>" in buffer:
                     buffer= buffer.split("</Synset>")[0] + "\n"
@@ -1251,7 +1269,90 @@ while True:
             elif status=="deleted-again":
                 add_sense(senses[undo_sense]["word"],senses[undo_sense]["synsetId"], file)
             elif status=="new":
-                remove_sense(undo_sense, senses[undo_sense]["synsetId"], file)
+
+                #remove_sense(undo_sense, senses[undo_sense]["synsetId"], file)
+
+                filein=open(file,"r",encoding="utf8")
+                fileout=open(file[:-4]+"_tmp.xml","w",encoding="utf8")
+
+                buffer=filein.readline()
+                pos_LE=0
+                delete_LE=False
+
+                while buffer!="":
+                    if "<LexicalEntry " in buffer:
+                        pos_LE=filein.tell()
+                    elif "id=\"" + undo_sense in buffer:
+                        filein.seek(pos_LE)
+
+                        sensecount=0
+
+                        buffer=filein.readline()
+                        while not "</LexicalEntry>" in buffer:
+                            if "<Sense " in buffer:
+                                sensecount+=1
+                            buffer=filein.readline()
+                        
+                        if sensecount<=1:
+                            delete_LE=True
+                        break
+
+                    buffer=filein.readline()
+
+                filein.seek(0)
+
+                buffer=filein.readline()
+
+                while buffer!="":
+
+                    if delete_LE and "<LexicalEntry " in buffer and filein.tell()==pos_LE:
+                        while not "</LexicalEntry>" in buffer:
+                            buffer=filein.readline()
+
+                        buffer=filein.readline()
+
+                    if not delete_LE and "id=\"" + undo_sense in buffer:
+                        while not "</Sense>" in buffer:
+                            buffer=filein.readline()
+                            
+                    else:
+                        fileout.write(buffer)
+                    buffer=filein.readline()
+
+                filein.close()
+                fileout.close()
+
+                syn_id=senses[undo_sense]["synsetId"]
+                undo_lemma=senses[undo_sense]["word"]
+
+                #remove from lemmas and senses fields from synset
+                synsets[syn_id]["lemmas"].remove(undo_lemma)
+                synsets[syn_id]["senses"].remove(undo_sense)
+
+                #remove from lemmas
+                undo_lemma=senses[undo_sense]["word"]
+                print(lemmas[undo_lemma])
+
+                if delete_LE:
+                    lemmas.pop(undo_lemma)
+                else:
+                    print("not delete_LE")
+                    for wordAttr in lemmas[undo_lemma]:
+                        if wordAttr["senseId"]==undo_sense:
+                            print("reached, deleting" + str(undo_sense))
+                            lemmas[undo_lemma].remove(wordAttr)
+
+                            print(lemmas[undo_lemma],flush=True)
+
+                            break
+
+
+                #remove from senses
+                senses.pop(undo_sense)
+                
+
+                os.remove(file)
+                os.rename(file[:-4]+"_tmp.xml",file)
 
         elif splitevent[1]=="Gloss":
             undo_synsetid=splitevent[2]
@@ -1477,7 +1578,9 @@ while True:
                         rowlength=0
 
                     layoutRow.append(SText(lemma, font="Helvetica 12 bold", text_color="blue", background_color=bg_color))
-                    if visualize_modifications and senses[sense]["status"]!="unmodified": layoutRow.append(Undo_button)
+                    if visualize_modifications and senses[sense]["status"]!="unmodified":
+                        if  bg_color=="green" and len(synsets[entry["synsetId"]]["lemmas"])>1:
+                            layoutRow.append(Undo_button)
                     rowlength+=len(lemma) + button_length
                 i=i+1
 
@@ -1622,7 +1725,9 @@ while True:
                                         rowlength=0
 
                                     translated_layoutRow.append(SText(lemma, font="Helvetica 12 bold", text_color="blue", background_color=bg_color))
-                                    if visualize_modifications and senses[sense]["status"]!="unmodified": translated_layoutRow.append(Undo_button)
+                                    if visualize_modifications and senses[sense]["status"]!="unmodified":
+                                        if  bg_color=="green" and len(synsets[translated_synsetId]["lemmas"])>1:
+                                            translated_layoutRow.append(Undo_button)
                                     rowlength+=len(lemma) + button_length
                                 i=i+1
 

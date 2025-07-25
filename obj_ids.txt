@@ -1,4 +1,4 @@
-syn-17
-sen-21
-wor-17
+syn-22
+sen-60
+wor-37
 ili-0
