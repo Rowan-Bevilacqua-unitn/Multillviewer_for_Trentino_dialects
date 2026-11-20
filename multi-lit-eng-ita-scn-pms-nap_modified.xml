@@ -91644,7 +91644,6 @@
       <Sense id="eng-sen82877" synset="eng-syn48826">
         <SenseRelation relType="derivation" target="eng-sen117345"></SenseRelation>
       </Sense>
-      <Sense id="eng-sennew59" synset="eng-syn12804" status="new"></Sense>
     </LexicalEntry>
     <LexicalEntry id="eng-word-r131406">
       <Lemma writtenForm="strongly" partOfSpeech="r"></Lemma>
@@ -199771,7 +199770,7 @@
       <Definition language="eng">the nations of the European continent collectively</Definition>
     </Synset>
     <Synset id="eng-syn108980" ili="lit-syn1463956" partOfSpeech="r" lexicalized="true">
-      <Definition language="eng">in a low position; near the ground</Definition>
+      <Definition language="eng" status="modified">in a low position; close to the ground</Definition>
     </Synset>
     <Synset id="eng-syn43449" ili="lit-syn1460340" partOfSpeech="n" lexicalized="true">
       <Definition language="eng">an international organization of European countries formed after World War II to reduce trade barriers and increase cooperation among its members</Definition>
@@ -208964,13 +208963,13 @@
     </Synset>
   </Lexicon>
   <Lexicon id="livelanguage-ita-lit" label="Italian" language="ita" email="gabor.bella@unitn.it" license="https://creativecommons.org/licenses/by-nc-sa/4.0/" version="1.0" dc:source="Wiktionary 2022.01. by Wikimedia Foundation (http://en.wiktionary.org); CogNet 2.1 by Khuyagbaatar Batsuren, National University of Mongolia (http://cognet.ukc.disi.unitn.it); KinDiv: Kinship Diversity 1.0 by Temuulen Khishigsuren (http://ukc.disi.unitn.it/index.php/kinship/); UniMet: Universal Metonymy 1.0 by Temuulen Khishigsuren and Gábor Bella (http://ukc.disi.unitn.it/index.php/metonymy/); MorphyNet 2.0 by Gábor Bella and Khuyagbaatar Batsuren (http://ukc.disi.unitn.it/index.php/morphynet/); Antonymy 1.0 by Gábor Bella (http://ukc.datascientia.eu); NorthEuraLex 0.9 by Johannes Dellert and Gerhard Jäger, Eberhard Karls Universität Tübingen (http://northeuralex.org/); MultiWordNet 1.4.2 by Fondazione Bruno Kessler (https://multiwordnet.fbk.eu/); Open Multilingual Wordnet 1.4 by Francis Bond, Division of Linguistics and Multilingual Studies, Nanyang Technological University (http://compling.hss.ntu.edu.sg/omw/); Princeton WordNet 2.1 by Princeton University (https://wordnet.princeton.edu)" dc:description="Italian is a language from the Indo-European family, spoken in Eurasia. The UKC Lexicon of Italian is represented as a lexico-semantic network. It consists of words, word senses, synsets, as well as sense-level and synset-level relationships." dc:publisher="KnowDive - University of Trento">
-    <LexicalEntry id="ita-word-nnew33" status="new">
-      <Lemma writtenForm="blob" partOfSpeech="n"></Lemma>
-      <Sense id="ita-sennew44" synset="ita-syn860841" status="new"></Sense>
+    <LexicalEntry id="ita-word-anew1" status="new">
+      <Lemma writtenForm="profondo" partOfSpeech="a"></Lemma>
+      <Sense id="ita-sennew1" synset="ita-synnew0" status="new"></Sense>
     </LexicalEntry>
-    <LexicalEntry id="ita-word-nnew17" status="new">
-      <Lemma writtenForm="om" partOfSpeech="n"></Lemma>
-      <Sense id="ita-sennew22" synset="ita-gap-lit1460748" status="new"></Sense>
+    <LexicalEntry id="ita-word-anew0" status="new">
+      <Lemma writtenForm="basso" partOfSpeech="a"></Lemma>
+      <Sense id="ita-sennew0" synset="ita-synnew0" status="new"></Sense>
     </LexicalEntry>
     <LexicalEntry id="ita-word-a1081361">
       <Lemma writtenForm="evoluto" partOfSpeech="a"></Lemma>
@@ -278747,7 +278746,7 @@
     <Synset id="ita-syn857032" ili="lit-syn1464651" partOfSpeech="n" lexicalized="true">
       <Definition language="eng">wild original of cultivated cabbages; common in western coastal Europe</Definition>
     </Synset>
-    <Synset id="ita-syn889800" ili="lit-syn1467633" partOfSpeech="n" lexicalized="lexical_gap" status="modified">
+    <Synset id="ita-syn889800" ili="lit-syn1467633" partOfSpeech="n" lexicalized="true">
       <Definition language="ita">piccolo elemento usato in diversi giochi da tavolo</Definition>
     </Synset>
     <Synset id="ita-syn873419" ili="lit-syn1465552" partOfSpeech="n" lexicalized="true">
@@ -286904,7 +286903,7 @@
     <Synset id="ita-syn879695" ili="lit-syn1987753" partOfSpeech="n" lexicalized="true">
       <Definition language="eng">a zoologist who studies birds</Definition>
     </Synset>
-    <Synset id="ita-syn863304" ili="lit-syn1463956" partOfSpeech="r" lexicalized="true">
+    <Synset id="ita-syn863304" ili="lit-syn1463956" partOfSpeech="r" lexicalized="false" status="modified">
       <Definition language="eng">in a low position; near the ground</Definition>
     </Synset>
     <Synset id="ita-syn879690" ili="lit-syn1460493" partOfSpeech="n" lexicalized="true">
@@ -293504,9 +293503,7 @@
     <Synset id="ita-gap-lit1467214" ili="lit-syn1467214" lexicalized="false"></Synset>
     <Synset id="ita-gap-lit1462584" ili="lit-syn1462584" lexicalized="false"></Synset>
     <Synset id="ita-gap-lit1460275" ili="lit-syn1460275" lexicalized="false"></Synset>
-    <Synset id="ita-gap-lit1460748" ili="lit-syn1460748" partOfSpeech="n" lexicalized="lexical_gap" status="modified">
-      <Definition language="ita" status="new">uomo generico ..</Definition>
-    </Synset>
+    <Synset id="ita-gap-lit1460748" ili="lit-syn1460748" lexicalized="false"></Synset>
     <Synset id="ita-gap-lit1462283" ili="lit-syn1462283" lexicalized="false"></Synset>
     <Synset id="ita-gap-lit1461768" ili="lit-syn1461768" lexicalized="false"></Synset>
     <Synset id="ita-gap-lit1468126" ili="lit-syn1468126" lexicalized="false"></Synset>
@@ -293579,20 +293576,11 @@
     <Synset id="ita-gap-lit1674028" ili="lit-syn1674028" lexicalized="false">
       <Definition language="ita">[eng] sibling</Definition>
     </Synset>
+    <Synset id="ita-synnew0" ili="lit-syn1463440" partOfSpeech="a" lexicalized="true" status="new">
+      <Definition language="ita" status="new">tono o frequenza bassa di suoni e voci</Definition>
+    </Synset>
   </Lexicon>
   <Lexicon id="livelanguage-scn-lit" label="Sicilian" language="scn" email="gabor.bella@unitn.it" license="https://creativecommons.org/licenses/by-nc-sa/4.0/" version="1.0" dc:source="Wiktionary 2022.01. by Wikimedia Foundation (http://en.wiktionary.org); CogNet 2.1 by Khuyagbaatar Batsuren, National University of Mongolia (http://cognet.ukc.disi.unitn.it); KinDiv: Kinship Diversity 1.0 by Temuulen Khishigsuren (http://ukc.disi.unitn.it/index.php/kinship/); MorphyNet 2.0 by Gábor Bella and Khuyagbaatar Batsuren (http://ukc.disi.unitn.it/index.php/morphynet/); Princeton WordNet 2.1 by Princeton University (https://wordnet.princeton.edu)" dc:description="Sicilian is a language from the Indo-European family, spoken in Eurasia. The UKC Lexicon of Sicilian is represented as a lexico-semantic network. It consists of words, word senses, synsets, as well as sense-level and synset-level relationships." dc:publisher="KnowDive - University of Trento">
-    <LexicalEntry id="scn-word-nnew20" status="new">
-      <Lemma writtenForm="ommu armato" partOfSpeech="n"></Lemma>
-      <Sense id="scn-sennew26" synset="scn-synnew19" status="new"></Sense>
-    </LexicalEntry>
-    <LexicalEntry id="scn-word-nnew19" status="new">
-      <Lemma writtenForm="uommu" partOfSpeech="n"></Lemma>
-      <Sense id="scn-sennew25" synset="scn-synnew18" status="new"></Sense>
-    </LexicalEntry>
-    <LexicalEntry id="scn-word-nnew18" status="new">
-      <Lemma writtenForm="ommo" partOfSpeech="n"></Lemma>
-      <Sense id="scn-sennew24" synset="scn-synnew17" status="new"></Sense>
-    </LexicalEntry>
     <LexicalEntry id="scn-word-n2237482">
       <Lemma writtenForm="pranzu" partOfSpeech="n"></Lemma>
       <Sense id="scn-sen3250946" synset="scn-syn1866349"></Sense>
@@ -297454,21 +297442,8 @@
     <Synset id="scn-gap-lit1674028" ili="lit-syn1674028" lexicalized="false">
       <Definition language="scn">[eng] sibling</Definition>
     </Synset>
-    <Synset id="scn-synnew17" ili="lit-syn1467246" partOfSpeech="n" lexicalized="false" status="new">
-      <Definition language="scn" status="new">un ommu</Definition>
-    </Synset>
-    <Synset id="scn-synnew18" ili="lit-syn1460748" partOfSpeech="n" lexicalized="lexical_gap" status="new">
-      <Definition language="scn" status="new">ommo gnerrico</Definition>
-    </Synset>
-    <Synset id="scn-synnew19" ili="lit-syn1465015" partOfSpeech="n" lexicalized="true" status="new">
-      <Definition language="scn" status="new">ommo militare</Definition>
-    </Synset>
   </Lexicon>
   <Lexicon id="livelanguage-pms-lit" label="Piemontese" language="pms" email="gabor.bella@unitn.it" license="https://creativecommons.org/licenses/by-nc-sa/4.0/" version="1.0" dc:source="Wiktionary 2022.01. by Wikimedia Foundation (http://en.wiktionary.org); CogNet 2.1 by Khuyagbaatar Batsuren, National University of Mongolia (http://cognet.ukc.disi.unitn.it); Princeton WordNet 2.1 by Princeton University (https://wordnet.princeton.edu)" dc:description="Piemontese is a language from the Indo-European family, spoken in Eurasia. The UKC Lexicon of Piemontese is represented as a lexico-semantic network. It consists of words, word senses, synsets, as well as sense-level and synset-level relationships." dc:publisher="KnowDive - University of Trento">
-    <LexicalEntry id="pms-word-nnew21" status="new">
-      <Lemma writtenForm="iu" partOfSpeech="n"></Lemma>
-      <Sense id="pms-sennew27" synset="pms-synnew20" status="new"></Sense>
-    </LexicalEntry>
     <LexicalEntry id="pms-word-n2268451">
       <Lemma writtenForm="musicista" partOfSpeech="n"></Lemma>
       <Sense id="pms-sen3290261" synset="pms-syn1887080"></Sense>
@@ -297963,15 +297938,8 @@
     <Synset id="pms-syn1826532" ili="lit-syn1826507" partOfSpeech="n" lexicalized="true">
       <Definition language="eng">a facial expression characterized by turning up the corners of the mouth; usually shows pleasure or amusement</Definition>
     </Synset>
-    <Synset id="pms-synnew20" ili="lit-syn1467246" partOfSpeech="n" lexicalized="true" status="new">
-      <Definition language="pms" status="new">tale persona</Definition>
-    </Synset>
   </Lexicon>
   <Lexicon id="livelanguage-nap-lit" label="Neapolitan" language="nap" email="gabor.bella@unitn.it" license="https://creativecommons.org/licenses/by-nc-sa/4.0/" version="1.0" dc:source="Wiktionary 2022.01. by Wikimedia Foundation (http://en.wiktionary.org); CogNet 2.1 by Khuyagbaatar Batsuren, National University of Mongolia (http://cognet.ukc.disi.unitn.it); Princeton WordNet 2.1 by Princeton University (https://wordnet.princeton.edu)" dc:description="Neapolitan is a language from the Indo-European family, spoken in Eurasia. The UKC Lexicon of Neapolitan is represented as a lexico-semantic network. It consists of words, word senses, synsets, as well as sense-level and synset-level relationships." dc:publisher="KnowDive - University of Trento">
-    <LexicalEntry id="nap-word-nnew22" status="new">
-      <Lemma writtenForm="oooooom" partOfSpeech="n"></Lemma>
-      <Sense id="nap-sennew28" synset="nap-synnew21" status="new"></Sense>
-    </LexicalEntry>
     <LexicalEntry id="nap-word-v2210851">
       <Lemma writtenForm="se fermà" partOfSpeech="v"></Lemma>
       <Sense id="nap-sen3218524" synset="nap-syn1849096"></Sense>
@@ -299122,9 +299090,6 @@
     </Synset>
     <Synset id="nap-syn1893858" ili="lit-syn1467684" partOfSpeech="v" lexicalized="true">
       <Definition language="eng">obtain by purchase; acquire by means of a financial transaction</Definition>
-    </Synset>
-    <Synset id="nap-synnew21" ili="lit-syn1467246" partOfSpeech="n" lexicalized="true" status="new">
-      <Definition language="nap" status="new">something</Definition>
     </Synset>
   </Lexicon>
 </LexicalResource>

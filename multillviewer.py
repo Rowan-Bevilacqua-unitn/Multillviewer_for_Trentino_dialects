@@ -10,6 +10,7 @@ if platform.uname()[0] == "Windows":
 #elif platform.uname()[0] == "Linux":
 #    name = "linux.so"
 import textwrap
+import shutil
 
 class SaxHandler(xml.sax.ContentHandler):
     def startDocument(self):
@@ -348,6 +349,7 @@ def add_sense(new_sense, syn_id, file):
 
     return 0
 
+# remove sense: r_senseId from synset :syn_id modifying file: file; also modifies the stack
 def remove_sense(r_senseId, syn_id ,file):
 
     filein=open(file,"r",encoding="utf8")
@@ -429,8 +431,14 @@ if len(sys.argv) < 2:
     print("An LMF/XML file is needed as input argument! Exiting.")
     sys.exit(1)
 
-file = sys.argv[1]
-original_file=file[:-13] + ".xml"
+original_file = sys.argv[1]
+file=original_file[:-4] + "_modified.xml"
+
+path=os.path.dirname(os.path.abspath(sys.argv[0])) + "\\"
+
+# create modified file if it doesn't exist
+if not os.path.exists(file):
+    shutil.copyfile(path + original_file, path + file)
 
 fn = open(file, encoding="utf8")
 parser = xml.sax.make_parser()
@@ -446,6 +454,7 @@ if len(langName)==0:
 
 sg.change_look_and_feel('LightGrey1')
 
+#create obj_ids.txt if it doesn't exist
 if not os.path.exists("obj_ids.txt"):
     fileout=open("obj_ids.txt","w")
     fileout.write("syn-0\nsen-0\nwor-0\nili-0\n")
@@ -458,15 +467,20 @@ if visualize_modifications:
     vb_color="green"
 else: vb_color="red"
 
+#Top of the screen
+
 layoutTop = [
                 [sg.Text('Multi-LiveLanguage Lexicon  Hub:[' + langCode[0] + ']', font='Verdana 14 bold'), sg.Text('Language to translate to:', font='Verdana 12'), sg.OptionMenu(lang_selection, key="-Selected language-"), sg.Button("Visualize modifications",key="-Visualize_modifications-", button_color=vb_color)],
                 [sg.Text('Word to search for:', font='Helvetica 12'), sg.InputText(key="wordinput", font='Helvetica 12',focus = True), sg.Button('Search Lexicon', bind_return_key = True)],
                 [sg.Column([], key="content")]
             ]
+
 Lexicon_info_combo=sg.Combo(langName,enable_events=True,readonly=True,key="Lexicon_info")
 layoutBottom = [sg.Text("Lexicon info:",font="Verdana 10"),Lexicon_info_combo,sg.Push(),sg.Button('Quit')]
 
 #section1 = [[sg.Input('Input sec 1', key='-IN1-')]]
+
+#The layout shown when the application is run
 
 layout = [ layoutTop,
            [sg.Text(key='-OUTPUT-', font='Helvetica 14 bold')],
@@ -476,8 +490,9 @@ layout = [ layoutTop,
          ]
 
 word=""
-            
-window = sg.Window('LiveLanguage Lexicon View', layout, resizable = True,finalize=True)
+
+window = sg.Window('MultiLiveLanguage Lexicon View', layout, resizable = True,finalize=True)
+#fullscreen
 window.maximize()
 # Event Loop to process "events" and get the "values" of the inputs
 while True:
@@ -493,7 +508,7 @@ while True:
     elif event.startswith("LEMMA"):
         wordPostfix = event.split(":")[1]
         word = wordPostfix.split("_")[0] # remove postfix "_" and synset ID
-    elif event.startswith("COLLAPSE_"):
+    elif event.startswith("COLLAPSE_"): # toggle collapsable object
         if event.endswith('-BUTTON-'):
             key = event[:-8]
         elif event.endswith('-TITLE-'):
@@ -507,14 +522,10 @@ while True:
         newContentSize = (contentSize[0], contentSize[1] + 200)
         window["content"].set_size(newContentSize)
 
-        # index=key.index('|')
-        # column_key="column_" + key[9:index]
-
-        # contentSize = window[column_key].get_size()
-        # newContentSize = (contentSize[0], contentSize[1] + 200)
-        # window[column_key].set_size(newContentSize)
-
         continue
+
+    # Visualise modifications Button
+
     elif(event.startswith("-Visualize_modifications-")):
         if visualize_modifications:
             visualize_modifications=False
@@ -523,6 +534,8 @@ while True:
         word = values["wordinput"].strip()
 
     # synset-entry buttons ------------------------------------------------------------------------------------------------------------------------
+    
+    # modifies the gloss of a synset 
     elif event.startswith("Correct_gloss_"):
 
         splite=event[len("Correct_gloss_"):].split("_")
@@ -597,14 +610,13 @@ while True:
         
         remove_sense_layout=[[sg.Text("Select which synonym to remove")]]
 
+        #create window with list of senses to choose from 
         row=[]
         for sense in synsets[syn_id]["senses"]:
-
             if not senses[sense]["status"].startswith("deleted"):
                 row.append(sg.Button(senses[sense]["word"],key=sense))
 
         remove_sense_layout.append(row)
-
         remove_sense_window=sg.Window("Remove synonym", remove_sense_layout)
 
         r_s_event, r_s_values = remove_sense_window.read()
@@ -653,6 +665,7 @@ while True:
             continue
 
     # deprecated
+    
     # elif event.startswith("Correct_sense_of_synset_"):
 
     #     splite=event[len("Correct_sense_of_synset_"):].split("_")
@@ -814,6 +827,7 @@ while True:
         # else: 
         #     continue
 
+    # set lexicalization of synset to false
     elif event.startswith("Delexicalize_"):
         syn_id=event[len("Delexicalize_"):].split("_")[1]
         
@@ -913,6 +927,7 @@ while True:
         os.remove(file)
         os.rename(file[:-4]+"_tmp.xml",file)
 
+    #add a completely new word as a translation of an existing one
     elif event.startswith("Add_synset_translation_"):
 
         source_id=event[len("Add_synset_translation_"):].split("_")[0]
@@ -951,8 +966,6 @@ while True:
         #             print("something")
 
 
-        
-
         new_gloss=sg.popup_get_text("Insert gloss")
         
         if new_gloss==None:
@@ -978,7 +991,6 @@ while True:
             continue
 
         else:
-
             new_id=""
             new_ili=""
 
@@ -1049,7 +1061,7 @@ while True:
 
             add_sense(new_sense, new_id, file)
     
-
+    # adds a translation to a synset as a lexical gap
     elif event.startswith("Add_lexical_gap_"):
 
         source_id=event[len("Add_lexical_gap_"):].split("_")[0]
@@ -1089,7 +1101,7 @@ while True:
                     fileout.write("    <Synset id=\"" + new_id + "\" ili=\"" + new_ili + "\" partOfSpeech=\"" + synsets[source_id]["pos"] + "\" lexicalized=\"lexical_gap\" status=\"new\"></Synset>\n")
                     fileout.write(buffer)
             else:
-                fileout.write(buffer)  
+                fileout.write(buffer)
 
             buffer=filein.readline()
 
@@ -1121,6 +1133,7 @@ while True:
         sg.popup("A concept is untranslatable if there is no way to translate it without using a description", title="What does untranslatable mean?")
         continue
 
+    #setting a synset to translatable while asking for gloss and word if neccessary
     elif event.startswith("Set_to_translatable_"):
 
         syn_id=event[len("Set_to_translatable_"):].split("_")[1]
@@ -1210,7 +1223,7 @@ while True:
         if new_sense!="":
             add_sense(new_sense,syn_id,file)
 
-
+    # set synset to lexical gap
     elif event.startswith("To_lexical_gap"):
 
         syn_id=event[len("To_lexical_gap"):].split("_")[1]
@@ -1256,7 +1269,8 @@ while True:
     elif event.startswith("Lexical_gap_info_"):
         sg.popup("A lexical gap is present when there does not exist a direct translation for a word but nonetheless does not require a description to be translated", title="What is a lexical gap?")
         continue
-    
+
+    # reverse a modification made to the Lexicons
     elif event.startswith("Undo_"):
         splitevent=event.split("_")
         if splitevent[1]=="Sense":
@@ -1615,6 +1629,8 @@ while True:
 
             if visualize_modifications and add_button and not added_button:
                 entry_layout.append([Undo_button])
+
+            #finding the equivalent synset in the target language
 
             untranslatable=False
             missing_translation=False
@@ -2008,6 +2024,9 @@ while True:
             #         collapsableSectionKey = "COLLAPSE_" + entry["synsetId"] + "|" + reltype
             #         entry_layout.append([Collapsible(collapsableSection, collapsableSectionKey, title=" " + reltype + " relations", arrows=("–", "+"), collapsed = True)])
     
+
+            # appending the appropriate buttons
+
             translated_column_key=""
             if untranslatable:
 
@@ -2045,7 +2064,6 @@ while True:
 
             elif not (same_language or not tranlation_present):
 
-                #Correction_button_translation=sg.Button("Correct word", key="Correct_sense_of_synset_" + entry["synsetId"] + "_" + translated_synsetId)
                 Gloss_correction_button_tranlslation=sg.Button("Correct gloss", key="Correct_gloss_" + entry["synsetId"] + "_" + translated_synsetId)
                 Add_synonym_button_translation=sg.Button("Add synonym", key="Add_sense_to_synset_" + entry["synsetId"] + "_" + translated_synsetId)
                 buttonrow=[Gloss_correction_button_tranlslation, Add_synonym_button_translation]
@@ -2067,7 +2085,6 @@ while True:
                 translated_layout.append(buttonrow)
 
             
-            #Correction_button=sg.Button("Correct word", key="Correct_sense_of_synset_" + entry["synsetId"])
             Gloss_correction_button=sg.Button("Correct gloss", key="Correct_gloss_" + entry["synsetId"])
             Add_synonym_button=sg.Button("Add synonym", key="Add_sense_to_synset_" + entry["synsetId"])
             buttonrow=[Gloss_correction_button, Add_synonym_button]
